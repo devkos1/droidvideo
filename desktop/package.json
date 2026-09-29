@@ -1,8 +1,8 @@
 {
   "name": "droidvideo",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Open-source Android USB and Wi-Fi camera with audio, OBS plug-in and Windows virtual camera",
-  "author": "DroidVideo contributors",
+  "author": "devkos1",
   "license": "MIT",
   "private": true,
   "main": "main.cjs",
@@ -38,23 +38,11 @@
         "to": "DroidVideo.apk"
       },
       {
-        "from": "../LICENSE",
-        "to": "LICENSE-DroidVideo.txt"
-      },
-      {
-        "from": "../native/build",
-        "to": "native",
+        "from": "../.build-deps/bundle",
+        "to": ".",
         "filter": [
-          "droidvideo-vcam-writer.exe"
+          "**/*"
         ]
-      },
-      {
-        "from": "../native/COPYING-GPL-2.0.txt",
-        "to": "native/COPYING-GPL-2.0.txt"
-      },
-      {
-        "from": "../native/THIRD-PARTY.md",
-        "to": "native/THIRD-PARTY.md"
       }
     ],
     "win": {

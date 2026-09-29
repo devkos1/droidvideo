@@ -9,7 +9,16 @@ for(const file of files)assert.ok(asar.extractFile(archive,file).equals(fs.readF
 // electron-builder removes build/dev metadata from the packaged package.json.
 const metadata=JSON.parse(asar.extractFile(archive,'package.json')),original=require('../desktop/package.json');
 for(const key of ['name','version','main','dependencies'])assert.deepEqual(metadata[key],original[key]);
-assert.deepEqual(fs.readFileSync(path.join(resources,'DroidVideo.apk')),fs.readFileSync(path.join(root,'dist/DroidVideo-0.2.0-Android.apk')));
+assert.equal(metadata.author.name||metadata.author,'devkos1');
+assert.deepEqual(fs.readFileSync(path.join(resources,'DroidVideo.apk')),fs.readFileSync(path.join(root,'dist/DroidVideo-0.3.0-Android.apk')));
 assert.deepEqual(fs.readFileSync(path.join(resources,'native/droidvideo-vcam-writer.exe')),fs.readFileSync(path.join(root,'native/build/droidvideo-vcam-writer.exe')));
+for(const file of ['droidvideo-obs.dll','droidvideo-camera.dll'])assert.deepEqual(fs.readFileSync(path.join(resources,'native',file)),fs.readFileSync(path.join(root,'native/build',file)));
+for(const folder of ['platform-tools','native','licenses']){
+  const bundle=path.join(root,'.build-deps/bundle',folder);
+  for(const file of fs.readdirSync(bundle,{recursive:true})){
+    if(fs.statSync(path.join(bundle,file)).isFile())assert.deepEqual(fs.readFileSync(path.join(resources,folder,file)),fs.readFileSync(path.join(bundle,file)),folder+'/'+file);
+  }
+}
+assert.deepEqual(fs.readFileSync(path.join(resources,'licenses/DroidVideo-Source.zip')),fs.readFileSync(path.join(root,'dist/DroidVideo-0.3.0-Source.zip')));
 const names=asar.listPackage(archive);assert.ok(!names.some(n=>n.endsWith('/obs.js')||n.endsWith('/obs.html')));
-console.log(`PASS packaged source (${files.length} files), embedded APK, native helper and removed legacy OBS UI`);
+console.log(`PASS packaged source (${files.length} files), devkos1 metadata, APK, ADB, both camera outputs, setup script, licenses and matching source archive`);

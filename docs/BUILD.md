@@ -1,58 +1,49 @@
-# Building DroidVideo 0.2.0
+# Building DroidVideo
 
-Windows x64 is required for the native components. Prerequisites: JDK 17 or 21, Android SDK platform 36 and build tools, Node.js 22+ with npm, Python 3, Git, Visual Studio 2019/2022 C++ Build Tools with a Windows SDK, and OBS Studio 32.x x64. FFmpeg/ffprobe are needed only for the optional media check.
+Windows x64 is required. Install JDK 17 or 21, Android SDK platform 36, Node.js 22+ with npm, Python 3, Git, Visual Studio 2019/2022 C++ Build Tools with a Windows SDK, and OBS Studio 32.x x64. Set `JAVA_HOME` and `ANDROID_HOME`. FFmpeg/ffprobe are needed only for the media verification tool.
 
-Set `JAVA_HOME` to the JDK and `ANDROID_HOME` to the Android SDK. The repository includes Gradle Wrapper.
+## Native headers
 
-Platform icons are checked into the repository. To regenerate the SVG/PNG/Windows ICO and Android adaptive/themed variants, run `python -X utf8 tools/build-icons.py` with Pillow installed. Windows resource editing remains enabled to embed the icon; code signing is disabled for this preview.
-
-## Native SDK headers
-
-The modified virtual-camera and libdshowcapture sources are already included in `native/vendor`; no regeneration is needed. The OBS plug-in also needs pinned libobs headers:
+Vendored camera sources are already included. Fetch the pinned OBS headers:
 
 ```powershell
 git clone --depth 1 --branch 32.1.0 --filter=blob:none --sparse https://github.com/obsproject/obs-studio.git .build-deps/obs-studio
 git -C .build-deps/obs-studio sparse-checkout set libobs deps/w32-pthreads
-git -C .build-deps/obs-studio rev-parse HEAD
 ```
 
-Expected commit: `5533a277e4400203b50114c993f89878d50a27b9`. The native build generates the OBS import library from the installed `obs.dll`. It compiles against OBS 32.1 headers; runtime module loading was checked against OBS 32.2.2.
+Expected commit: `5533a277e4400203b50114c993f89878d50a27b9`. `build-native.ps1` creates an import library from the installed OBS DLL. Pass `-ObsRoot` for a non-default OBS folder; set `OBS_ROOT` for `verify-obs.py`.
 
-## Build and package
+## Build the two downloads
 
 ```powershell
-.\android\gradlew.bat -p android assembleDebug lintDebug
-npm.cmd --prefix desktop ci
-npm.cmd --prefix desktop test
-.\tools\build-native.ps1
-python -X utf8 tools/verify-native.py
-python -X utf8 tools/verify-obs.py
-npm.cmd --prefix desktop run dist
-python -X utf8 tools/package-source.py
-.\tools\package-components.ps1
+.\tools\build.ps1
 ```
 
-Or use `tools/build.ps1` after prerequisites and SDK headers are ready. For a non-default OBS folder, pass `-ObsRoot` to `build-native.ps1` and set `OBS_ROOT` for `verify-obs.py`.
+The script builds/lints Android, runs desktop tests, builds and checks native components, creates corresponding source, prepares bundled ADB/components/notices, then packages and checks Windows. Outputs: `dist/DroidVideo-0.3.0-Android.apk` and `dist/windows/DroidVideo-0.3.0-Windows.exe`.
 
-`build-native.ps1` uses the installed Visual Studio C++ toolchain, static C runtime, and Windows SDK libraries. It builds the OBS module, distinct DirectShow DLL, frame writer and registry-free verification executable. It does not install or register anything.
+`prepare-bundle.ps1` downloads the pinned official ADB archive and verifies SHA-256 before extraction. Only ADB, its two USB libraries and notices are included. The EXE also contains the OBS plug-in, DirectShow camera, frame writer, installer script and source archive. No separate component ZIP is needed. Internet is needed at build time; app setup does not download these components.
 
-If Android incremental packaging is locked, an optional fresh output directory avoids touching the old build:
+For a fresh Android output directory, pass `-PoutputRoot=C:/YourProject/android/app/build/fresh` to Gradle, then copy its APK to `android/app/build/outputs/apk/debug/app-debug.apk` before packaging Windows.
 
-```powershell
-.\android\gradlew.bat -p android -PoutputRoot=C:/YourProject/android/app/build/fresh assembleDebug lintDebug
-```
+## Signing
 
-Before desktop packaging, copy that build's `outputs/apk/debug/app-debug.apk` to the normal `android/app/build/outputs/apk/debug/app-debug.apk` location. The Windows app bundles that exact APK. Copy it to `dist/DroidVideo-0.2.0-Android.apk` too.
+The default preview is unsigned. `author: devkos1` sets application metadata; only a trusted signing identity can establish the verified publisher. Never add signing credentials to the repository.
 
-## Development and optional checks
+When a valid code-signing certificate is available, use electron-builder's `CSC_LINK` and `CSC_KEY_PASSWORD` environment variables and set `DROIDVIDEO_SIGN=1`. The build enables signing for the application and portable launcher. Sign native binaries and the installer script with the same trusted identity before preparing the bundle. A new signed file can still receive SmartScreen reputation warnings. See Microsoft's [code-signing guidance](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/code-signing-options).
+
+The Android APK currently uses the existing development key for update compatibility. Use a persistent private release key for production distribution and retain it securely for future updates.
+
+## Development and verification
 
 ```powershell
 npm.cmd --prefix desktop start
+npm.cmd --prefix desktop test
+python -X utf8 tools/verify-native.py
+python -X utf8 tools/verify-obs.py
 node tools/verify-media.cjs
+python -X utf8 tools/benchmark-vcam.py
 ```
 
-`verify-media.cjs` generates one-second 1080p60 and 4K30 H.264/AAC samples, passes them through the project's MPEG-TS mux, checks A/V timestamps, and decodes with FFmpeg. It prints a temporary sample directory. `node tools/preview-fixture.cjs <that-directory>` serves an explicitly labeled synthetic camera at `http://127.0.0.1:28186`. This fixture is excluded from the packaged app. The synthetic generator itself is not a real-time performance benchmark.
+Native checks do not install/register a camera or modify OBS. The benchmark measures raw-pipe conversion/rotation/shared-memory throughput, not phone or OBS performance. `preview-fixture.cjs` serves explicitly labelled synthetic video on port 28186; it is excluded from the packaged app. Production uses port 27186. Do not run fixture and production together: both use the OBS pipe.
 
-Production UI uses port 27186 and the OBS named pipe `DroidVideo.OBS`. Do not run the fixture alongside a production server: both use the same pipe. No native camera registration is needed for `verify-native.py`; it tests the COM class factory, supported formats, I420/NV12 conversion and all four rotations through shared memory. `verify-obs.py` loads the module in libobs without launching OBS or changing its settings; it does not verify a live scene.
-
-The APK uses a debug signature and Windows binaries are unsigned. Release signing and credentials are deliberately outside the repository. Keep native corresponding source, build scripts and license files with binary distributions.
+To regenerate icons, install Pillow and run `python -X utf8 tools/build-icons.py`. Keep licenses, modified native source and corresponding build scripts with binary redistributions. **Licenses & source** in the app opens the bundled copy.

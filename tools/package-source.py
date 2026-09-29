@@ -5,7 +5,7 @@ import os
 
 root = Path(__file__).resolve().parent.parent
 excluded = {"node_modules", "build", ".gradle", "dist", ".git", "__pycache__", ".build-deps"}
-output = root / "dist" / "DroidVideo-0.2.0-Source.zip"
+output = root / "dist" / "DroidVideo-0.3.0-Source.zip"
 output.parent.mkdir(exist_ok=True)
 with ZipFile(output, "w", compression=ZIP_DEFLATED) as archive:
     for folder, directories, files in os.walk(root):

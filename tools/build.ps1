@@ -13,16 +13,19 @@ try {
     & "$PSScriptRoot\build-native.ps1"
     & python -X utf8 "$PSScriptRoot\verify-native.py"
     if ($LASTEXITCODE -ne 0) { throw 'Native checks failed.' }
-    & npm.cmd --prefix desktop run dist
+    New-Item -ItemType Directory -Force dist | Out-Null
+    Copy-Item -LiteralPath 'android\app\build\outputs\apk\debug\app-debug.apk' -Destination 'dist\DroidVideo-0.3.0-Android.apk'
+    & python -X utf8 "$PSScriptRoot\package-source.py"
+    if ($LASTEXITCODE -ne 0) { throw 'Source packaging failed.' }
+    & "$PSScriptRoot\prepare-bundle.ps1"
+    if($env:DROIDVIDEO_SIGN -eq '1'){
+        & npm.cmd --prefix desktop run dist -- --config.win.signExecutable=true
+    }else{ & npm.cmd --prefix desktop run dist }
     if ($LASTEXITCODE -ne 0) { throw 'Windows packaging failed.' }
-    Copy-Item -LiteralPath 'android\app\build\outputs\apk\debug\app-debug.apk' -Destination 'dist\DroidVideo-0.2.0-Android.apk'
     & node "$PSScriptRoot\verify-package.cjs"
     if ($LASTEXITCODE -ne 0) { throw 'Packaged files differ from source.' }
     & node "$PSScriptRoot\verify-icons.cjs"
     if ($LASTEXITCODE -ne 0) { throw 'Windows icon verification failed.' }
-    & python -X utf8 "$PSScriptRoot\package-source.py"
-    if ($LASTEXITCODE -ne 0) { throw 'Source packaging failed.' }
-    & "$PSScriptRoot\package-components.ps1"
     & "$PSScriptRoot\hash-release.ps1"
     Write-Output 'Build complete. See dist/.'
 } finally { Pop-Location }

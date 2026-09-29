@@ -1,8 +1,8 @@
-# Run from an extracted Windows-Components package in an elevated terminal.
+# Called by the Windows app after an explicit setup click and Windows elevation.
 param([ValidateSet('OBS','Camera')][string]$Component='OBS',[switch]$Uninstall,[string]$ObsRoot="$env:ProgramFiles\obs-studio")
 $ErrorActionPreference='Stop'
 $admin=([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-if(!$admin){throw 'Run the matching .cmd file as administrator (right-click).'}
+if(!$admin){throw 'Accept the Windows permission prompt to install this component.'}
 if(![Environment]::Is64BitProcess){throw 'Use 64-bit PowerShell.'}
 if($Component -eq 'OBS'){
     if(Get-Process obs64 -ErrorAction SilentlyContinue){throw 'Close OBS Studio first.'}

@@ -13,12 +13,16 @@ test('authenticated USB lifecycle, WebSocket framing, OBS TS, and cleanup',async
   const adb={devices:async()=>[{serial:'USB123',state:'device',model:'Test phone'}],
     forward:async serial=>{assert.equal(serial,'USB123');return [42,source.address().port];},disconnect:async()=>{disconnected++;}};
   const rpc=async(port,endpoint)=>{ assert.equal(port,42); if(endpoint==='/cameras') return {cameras:[camera]}; if(endpoint==='/start') phase='streaming'; if(endpoint==='/stop') phase='idle'; return {phase}; };
-  const server=await startServer({port:0,pipePath:process.platform==='win32'?'\\\\.\\pipe\\DroidVideo.Test-'+process.pid:'/tmp/dv-test-'+process.pid,adb,phoneRequest:rpc});
+  let installs=0;
+  const components={status:()=>({available:true,obsInstalled:installs>0}),install:async name=>{assert.equal(name,'OBS');installs++;return components.status();}};
+  const server=await startServer({port:0,pipePath:process.platform==='win32'?'\\\\.\\pipe\\DroidVideo.Test-'+process.pid:'/tmp/dv-test-'+process.pid,adb,phoneRequest:rpc,components});
   t.after(async()=>{await server.close(); if(phoneSocket)phoneSocket.destroy(); await new Promise(r=>source.close(r));});
   const boot=await fetch(server.url+'/api/bootstrap').then(r=>r.json());
   const post=(route,body={},extra={})=>fetch(server.url+'/api/'+route,{method:'POST',headers:{'X-DroidVideo-Token':boot.token,...extra},body:JSON.stringify(body)});
   assert.equal((await fetch(server.url+'/api/connect',{method:'POST',body:'{}'})).status,403);
   assert.equal((await post('connect',{}, {Origin:'https://attacker.invalid'})).status,403);
+  assert.equal((await post('setup-obs',{}, {Origin:'https://attacker.invalid'})).status,403);assert.equal(installs,0);
+  assert.equal((await post('setup-obs')).status,200);assert.equal(installs,1);
   assert.equal((await post('devices')).status,200);
   assert.equal((await post('connect',{serial:'USB123'})).status,200);
   assert.equal((await post('start',{cameraId:'0',mode:'1920x1080@60'})).status,200);

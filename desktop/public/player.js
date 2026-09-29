@@ -46,14 +46,22 @@ export class CameraPlayer {
     this.decoder = new VideoDecoder({ output: frame => {
       try {
         const turn = this.rotation % 180 !== 0;
-        const w = turn ? frame.displayHeight : frame.displayWidth, h = turn ? frame.displayWidth : frame.displayHeight;
-        if (this.canvas.width !== w || this.canvas.height !== h) { this.canvas.width = w; this.canvas.height = h; }
-        this.context.save(); this.context.translate(w/2,h/2); this.context.rotate(this.rotation*Math.PI/180);
-        this.context.drawImage(frame,-frame.displayWidth/2,-frame.displayHeight/2,frame.displayWidth,frame.displayHeight); this.context.restore();
-        this.onVideoFrame(frame); this.onFrame();
+        // Forward the full-resolution frame, but keep the on-screen preview light.
+        this.onVideoFrame(frame);
+        const now=performance.now();
+        if(!document.hidden&&(!this.lastDraw||now-this.lastDraw>=1000/24)){
+          this.lastDraw=now;
+          const scale=Math.min(1,1280/Math.max(frame.displayWidth,frame.displayHeight));
+          const dw=Math.round(frame.displayWidth*scale),dh=Math.round(frame.displayHeight*scale);
+          const w=turn?dh:dw,h=turn?dw:dh;
+          if(this.canvas.width!==w||this.canvas.height!==h){this.canvas.width=w;this.canvas.height=h;}
+          this.context.save();this.context.translate(w/2,h/2);this.context.rotate(this.rotation*Math.PI/180);
+          this.context.drawImage(frame,-dw/2,-dh/2,dw,dh);this.context.restore();
+        }
+        this.onFrame();
       } finally { frame.close(); }
     }, error: error => { this.waitingKey = true; this.onError(t("Preview decoding error: ","Előnézeti dekódolási hiba: ")+error.message); } });
-    this.decoder.configure({ codec: this.codec, optimizeForLatency: true });
+    this.decoder.configure({ codec: this.codec, optimizeForLatency: true, hardwareAcceleration:'prefer-hardware' });
   }
   packet(bytes) {
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);

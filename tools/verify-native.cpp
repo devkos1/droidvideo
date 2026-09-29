@@ -29,5 +29,5 @@ int wmain(int argc,wchar_t **argv){
     uint32_t w,h;uint64_t interval,ts;video_queue_get_info(q,&w,&h,&interval);
     std::vector<uint8_t> pixels(size_t(w)*h*3/2);nv12_scale_t scale{};nv12_scale_init(&scale,TARGET_FORMAT_NV12,w,h,w,h);
     if(!video_queue_read(q,&scale,pixels.data(),&ts))return 21;
-    printf("%u %u %llu",w,h,interval);for(size_t i=0;i<pixels.size()&&i<24;i++)printf(" %u",pixels[i]);puts("");video_queue_close(q);return 0;
+    printf("%u %u %llu",w,h,interval);for(size_t i=0;i<pixels.size()&&(pixels.size()<=65536||i<24);i++)printf(" %u",pixels[i]);puts("");video_queue_close(q);return 0;
 }

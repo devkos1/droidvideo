@@ -27,7 +27,7 @@ function phoneRequest(port, endpoint, body = {}) {
 }
 
 async function startServer(options = {}) {
-  const adb = options.adb || new Adb();
+  const adb = options.adb || new Adb(options.adbPath);
   const usbRpc = options.phoneRequest || phoneRequest;
   let pair = null, transport = 'usb', networkTest = null, cameraCatalog = [];
   const rpc = (port,endpoint,body) => pair ? (options.wifiRequest || wifiRequest)(pair,endpoint,body) : usbRpc(port,endpoint,body);
@@ -38,12 +38,13 @@ async function startServer(options = {}) {
   const tcpClients = new Set();
   const ws = new WebSocketServer({ noServer: true, maxPayload: 1024 });
   const keyFrame = () => { if (controlPort) rpc(controlPort, '/keyframe').catch(() => {}); };
-  const virtual = new VirtualCamera(options.nativePath || path.resolve(__dirname,'../native/build'),()=>sendState());
+  const virtual = new VirtualCamera(options.nativePath || path.resolve(__dirname,'../native/build'),()=>sendState(),keyFrame);
   const frameWs = new WebSocketServer({noServer:true,maxPayload:24*1024*1024,perMessageDeflate:false});
-  const state = () => ({virtualCamera:virtual.status(),type:'status',connected,status:lastStatus,error:streamError,transport,networkTest});
+  const state = () => ({components:options.components?.status()||{available:false},virtualCamera:virtual.status(),type:'status',connected,status:lastStatus,error:streamError,transport,networkTest});
   const sendState = () => { for (const client of ws.clients) if (client.readyState === WebSocket.OPEN) client.send(JSON.stringify(state())); };
 
   function packetReceived({ flags, timestamp, data, packet }) {
+    virtual.encoded(flags,data,lastStatus);
     if (flags === 2) {
       codecConfig = Buffer.from(packet);
       for (const client of [...ws.clients, ...tcpClients]) client.waitingKey = true;
@@ -76,7 +77,7 @@ async function startServer(options = {}) {
     socket.on('error', e => { streamError = `Video connection: ${e.message}`; });
     socket.on('close', () => {
       if (upstream !== socket) return;
-      upstream = null; codecConfig = null;
+      upstream = null; codecConfig = null;virtual.reset();
       for (const client of ws.clients) client.waitingKey = true;
       for (const client of tcpClients) client.destroy();
       sendState();
@@ -84,7 +85,7 @@ async function startServer(options = {}) {
     });
   }
   async function disconnect() {
-    virtual.stop();
+    virtual.stop();virtual.reset();
     connected = false; clearTimeout(reconnectTimer); clearInterval(monitor); monitor = null;
     const port = controlPort; controlPort = null; videoPort = null; serial = null;
     if (upstream) { const old = upstream; upstream = null; old.destroy(); }
@@ -133,7 +134,7 @@ async function startServer(options = {}) {
     let url;
     try { url = new URL(req.url, base); } catch { return json(400, { error: 'Invalid URL' }); }
     if (req.method === 'GET' && url.pathname === '/api/bootstrap') {
-      return json(200, { token, obsSource:'DroidVideo Camera + Audio', version: '0.2.0' });
+      return json(200, { token, obsSource:'DroidVideo Camera + Audio', version: '0.3.0' });
     }
     if (url.pathname.startsWith('/api/')) {
       if (req.method !== 'POST' || req.headers['x-droidvideo-token'] !== token || (req.headers.origin && req.headers.origin !== base)) return json(403, { error: 'Invalid session' });
@@ -179,8 +180,18 @@ async function startServer(options = {}) {
           case '/disconnect': await disconnect(); value = { connected: false }; break;
           case '/status': value = { ...state(),serial }; break;
           case '/virtual-camera':
-            if(body.enabled) {if(!connected||lastStatus?.phase!=='streaming')throw new Error('Start the video first.');await virtual.start();}else virtual.stop();
+            if(body.enabled) {
+              if(!connected||lastStatus?.phase!=='streaming')throw new Error('Start the video first.');
+              if(options.components){await options.components.refresh();if(!options.components.status().cameraInstalled)await options.components.install('Camera');}
+              await virtual.start();
+            }else virtual.stop();
             value=virtual.status();break;
+          case '/setup-obs':
+            if(!options.components)throw new Error('Open the DroidVideo Windows app to install the OBS plug-in.');
+            value=await options.components.install('OBS');sendState();break;
+          case '/licenses':
+            if(!options.openLicenses)throw new Error('See the source repository for licenses.');
+            {const error=await options.openLicenses();if(error)throw new Error(error);value={opened:true};}break;
           case '/network':
             if(!connected)throw new Error('Connect the phone first.');
             value=await rpc(controlPort,'/network');break;
@@ -201,7 +212,7 @@ async function startServer(options = {}) {
               // A new encoder session may restart its clock and SPS. OBS must
               // receive a fresh transport stream, not a discontinuous old PES.
               for (const client of tcpClients) client.destroy();
-              codecConfig = null;
+              codecConfig = null;virtual.reset();
               for (const client of ws.clients) client.waitingKey = true;
             }
             value = await rpc(controlPort, route, body);lastStatus = await rpc(controlPort,'/status');if(route==='/stop')virtual.stop();sendState();break;
@@ -227,7 +238,12 @@ async function startServer(options = {}) {
     if(url.pathname==='/virtual-frames')return frameWs.handleUpgrade(req,socket,head,client=>{
       if(frameWs.clients.size>1){client.close(1008,'Only one virtual-camera producer is supported');return;}
       client.on('error',()=>{});
-      client.on('message',(data,binary)=>{try{if(!binary)throw new Error('Binary frame required');virtual.frame(data);client.send('ack');}catch(e){client.close(1008,'Invalid frame');}});
+      let pending=false;
+      client.on('message',async(data,binary)=>{try{
+        if(!binary||pending)throw new Error('One binary frame at a time required');
+        pending=true;await virtual.frame(data);pending=false;
+        if(client.readyState===WebSocket.OPEN)client.send('ack');
+      }catch(e){client.close(1008,'Invalid frame');}});
     });
     ws.handleUpgrade(req, socket, head, client => {
       client.waitingKey = true;

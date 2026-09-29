@@ -7,10 +7,10 @@ const { parseDevices } = require('./protocol.cjs');
 const exec = promisify(execFile);
 
 class Adb {
-  constructor() { this.customPath = ''; this.serial = null; this.ports = []; }
+  constructor(bundledPath = '') { this.bundledPath=bundledPath; this.customPath = ''; this.serial = null; this.ports = []; }
   executable() {
     if (this.customPath) return this.customPath;
-    const candidates = [process.env.ADB_PATH,
+    const candidates = [this.bundledPath, process.env.ADB_PATH,
       process.env.ANDROID_HOME && path.join(process.env.ANDROID_HOME, 'platform-tools', 'adb.exe'),
       process.env.ANDROID_SDK_ROOT && path.join(process.env.ANDROID_SDK_ROOT, 'platform-tools', 'adb.exe'),
       process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, 'Android', 'Sdk', 'platform-tools', 'adb.exe')];
