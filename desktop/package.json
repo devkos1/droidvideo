@@ -1,0 +1,69 @@
+{
+  "name": "droidvideo",
+  "version": "0.2.0",
+  "description": "Open-source Android USB and Wi-Fi camera with audio, OBS plug-in and Windows virtual camera",
+  "author": "DroidVideo contributors",
+  "license": "MIT",
+  "private": true,
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "server": "node server.cjs",
+    "test": "node --test test/*.test.cjs",
+    "dist": "electron-builder --win portable --x64"
+  },
+  "dependencies": {
+    "ws": "^8.22.0"
+  },
+  "devDependencies": {
+    "electron": "44.4.5",
+    "electron-builder": "26.15.3"
+  },
+  "build": {
+    "appId": "hu.droidvideo.desktop",
+    "productName": "DroidVideo",
+    "directories": {
+      "output": "../dist/windows"
+    },
+    "files": [
+      "main.cjs",
+      "server.cjs",
+      "lib/**",
+      "public/**",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../android/app/build/outputs/apk/debug/app-debug.apk",
+        "to": "DroidVideo.apk"
+      },
+      {
+        "from": "../LICENSE",
+        "to": "LICENSE-DroidVideo.txt"
+      },
+      {
+        "from": "../native/build",
+        "to": "native",
+        "filter": [
+          "droidvideo-vcam-writer.exe"
+        ]
+      },
+      {
+        "from": "../native/COPYING-GPL-2.0.txt",
+        "to": "native/COPYING-GPL-2.0.txt"
+      },
+      {
+        "from": "../native/THIRD-PARTY.md",
+        "to": "native/THIRD-PARTY.md"
+      }
+    ],
+    "win": {
+      "target": "portable",
+      "icon": "public/icon.ico",
+      "signExecutable": false
+    },
+    "portable": {
+      "artifactName": "DroidVideo-${version}-Windows.exe"
+    }
+  }
+}

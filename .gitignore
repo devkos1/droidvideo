@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.gradle/
+**/build/
+local.properties
+*.log
+.DS_Store
+.build-deps/
+*.obj
+*.pdb
+*.ilk
+*.exp
+*.lib
+*.jks
+*.keystore
+.env
