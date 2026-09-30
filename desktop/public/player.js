@@ -17,6 +17,7 @@ export class CameraPlayer {
         if (!state.connected || !['streaming', 'starting'].includes(state.status?.phase)) {
           this.clear(); this.waitingKey = true;
         }
+        this.paused=state.previewEnabled===false;if(this.paused){this.closeDecoder();this.clear();this.waitingKey=true;}
         this.onState(state); return;
       }
       try { this.packet(new Uint8Array(event.data)); } catch (e) { this.onError(e.message); }
@@ -64,6 +65,7 @@ export class CameraPlayer {
     this.decoder.configure({ codec: this.codec, optimizeForLatency: true, hardwareAcceleration:'prefer-hardware' });
   }
   packet(bytes) {
+    if(this.paused)return;
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     if (bytes.length < 13 || bytes.length !== view.getUint32(9)+13) throw new Error(t("Invalid video packet","Hibás videócsomag"));
     const flags = bytes[0], payload = bytes.subarray(13);

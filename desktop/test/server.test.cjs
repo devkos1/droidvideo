@@ -15,7 +15,8 @@ test('authenticated USB lifecycle, WebSocket framing, OBS TS, and cleanup',async
   const rpc=async(port,endpoint)=>{ assert.equal(port,42); if(endpoint==='/cameras') return {cameras:[camera]}; if(endpoint==='/start') phase='streaming'; if(endpoint==='/stop') phase='idle'; return {phase}; };
   let installs=0;
   const components={status:()=>({available:true,obsInstalled:installs>0}),install:async name=>{assert.equal(name,'OBS');installs++;return components.status();}};
-  const server=await startServer({port:0,pipePath:process.platform==='win32'?'\\\\.\\pipe\\DroidVideo.Test-'+process.pid:'/tmp/dv-test-'+process.pid,adb,phoneRequest:rpc,components});
+  let hidden=false;
+  const server=await startServer({port:0,pipePath:process.platform==='win32'?'\\\\.\\pipe\\DroidVideo.Test-'+process.pid:'/tmp/dv-test-'+process.pid,adb,phoneRequest:rpc,components,enterBackground:()=>{hidden=true;}});
   t.after(async()=>{await server.close(); if(phoneSocket)phoneSocket.destroy(); await new Promise(r=>source.close(r));});
   const boot=await fetch(server.url+'/api/bootstrap').then(r=>r.json());
   const post=(route,body={},extra={})=>fetch(server.url+'/api/'+route,{method:'POST',headers:{'X-DroidVideo-Token':boot.token,...extra},body:JSON.stringify(body)});
@@ -36,5 +37,12 @@ test('authenticated USB lifecycle, WebSocket framing, OBS TS, and cleanup',async
   await new Promise((resolve,reject)=>{const deadline=setTimeout(()=>reject(new Error('Video output timed out')),2000); const check=()=>{if(wsData.length>=2 && rawData.length){clearTimeout(deadline);resolve();}else setTimeout(check,10);};check();});
   assert.deepEqual(wsData,[config,key]);
   const ts=Buffer.concat(rawData);assert.equal(ts.length%188,0);assert.equal(ts[0],0x47);assert.equal(ts[188],0x47);assert.ok(ts.includes(Buffer.from([0,0,1,0xe0])));
+  assert.equal((await post('background')).status,200);assert.equal(hidden,true);
+  const previous=wsData.length,oldRaw=rawData.length;
+  phoneSocket.write(key);await new Promise(r=>setTimeout(r,50));
+  assert.equal(wsData.length,previous);assert.ok(rawData.length>oldRaw);
+  assert.equal((await post('status').then(r=>r.json())).connected,true);
+  await post('preview',{enabled:true});phoneSocket.write(key);await new Promise(r=>setTimeout(r,50));
+  assert.ok(wsData.length>previous);assert.equal(wsData[previous][0],2);
   await post('disconnect'); assert.equal((await post('status').then(r=>r.json())).connected,false); assert.ok(disconnected>=2);
 });

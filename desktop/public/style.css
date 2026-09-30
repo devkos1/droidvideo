@@ -3,3 +3,5 @@
 .obs-page{margin:0;width:100vw;height:100vh;overflow:hidden;background:#000}.obs-page canvas{width:100%;height:100%;object-fit:contain;display:block}
 .viewfinder{min-height:280px}.camera-symbol{flex-shrink:0}@media(max-width:1000px){.rail{display:none}main{margin-left:0}}
 .header-actions{display:flex;align-items:center;gap:14px}.connection-badge b{font-weight:500}.wifi-panel,.network-card{padding:20px 24px;border-bottom:1px solid #293339}.wifi-panel{background:#182126;border:1px solid #2d3d43;border-radius:14px;margin-bottom:20px}.wifi-panel input{width:100%;margin-top:10px}.network-card p{margin:8px 0}.network-card .text-button{margin-right:18px}.device-bar #transport{min-width:90px;max-width:110px}.metrics strong{font-size:24px}button:disabled{opacity:.45;cursor:not-allowed}header{gap:20px}.header-actions .connection-badge{white-space:nowrap}dialog{max-height:85vh;overflow:auto}[hidden]{display:none!important}
+
+.header-actions{flex-wrap:wrap;justify-content:flex-end;max-width:470px}#welcomeDialog{width:min(620px,90vw)}#welcomeNext,#welcomeBack{margin-top:22px}#welcomeStatus,#welcomePhoneStatus{white-space:pre-wrap;color:#9ae7c4}

@@ -14,7 +14,7 @@ try {
     & python -X utf8 "$PSScriptRoot\verify-native.py"
     if ($LASTEXITCODE -ne 0) { throw 'Native checks failed.' }
     New-Item -ItemType Directory -Force dist | Out-Null
-    Copy-Item -LiteralPath 'android\app\build\outputs\apk\debug\app-debug.apk' -Destination 'dist\DroidVideo-0.3.1-Android.apk'
+    Copy-Item -LiteralPath 'android\app\build\outputs\apk\debug\app-debug.apk' -Destination 'dist\DroidVideo-0.3.2-Android.apk'
     & python -X utf8 "$PSScriptRoot\package-source.py"
     if ($LASTEXITCODE -ne 0) { throw 'Source packaging failed.' }
     & "$PSScriptRoot\prepare-bundle.ps1"

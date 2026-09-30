@@ -1,14 +1,18 @@
-# Verification report — 0.3.1 preview
+# Verification report — 0.3.2 preview
 
 Windows x64, September 30, 2026. Video fixtures are synthetic. [Magyar változat](TESTING.hu.md).
 
 ## Changes verified
 
+- Background mode suppresses preview video delivery and decoding while keeping the phone connection and output transport active. Resuming sends codec configuration and requests a keyframe. The startup guide was checked for both OBS and virtual-camera routes in the browser. Packaged tray hide/restore still needs an end-user check.
+- ADB errors are checked even on zero-exit activity launches. A missing phone package blocks forwarding and launch. Insufficient storage and signature conflicts receive actionable messages; no user files are deleted.
+- D3D11 decoding and forced software fallback each decoded every frame of the 1080p60 and 4K30 fixtures. Software output reuses its allocation; compatible CPU buffers go directly to the shared output without an intermediate copy. GPU decode still requires readback for DirectShow; these short runs do not establish sustained 4K performance in another app.
+
 - The OBS plug-in uses bounded loopback UDP with hardware decoding enabled and asynchronous buffering disabled. Two sources share one decoder; repeated settings updates preserve it. An isolated libobs test closes the sources and shuts down without incoming video within a three-second limit. This is a regression check, not proof of real-device latency or stability.
 - Compatible registered camera DLLs are reused even when their build hashes differ. Explicit installation uses versioned paths, avoiding replacement of loaded DLLs. Detection is tested with mocks; elevated installation still needs device testing.
 
-- Android `assembleDebug` and `lintDebug` passed. APK versionCode 4 / versionName 0.3.1; the existing development signature is retained for updates.
-- Seventeen Node tests passed, including protocol framing, MPEG-TS, USB/Wi-Fi controls, pairing, bounded native decode input, stale-frame rejection, setup endpoint authentication, bundled ADB selection, installer argument quoting and cancelled elevation. Installer tests use mocks; they do not register components.
+- Android `assembleDebug` and `lintDebug` passed. APK versionCode 5 / versionName 0.3.2; the existing development signature is retained for updates.
+- Twenty Node tests passed, including protocol framing, MPEG-TS, USB/Wi-Fi controls, pairing, bounded native decode input, stale-frame rejection, setup endpoint authentication, bundled ADB selection, installer argument quoting and cancelled elevation. Installer tests use mocks; they do not register components.
 - Native x64 build passed. DirectShow COM creation and 1080p60/4K30 formats work without camera registration.
 - Sixteen pixel-exact raw-frame cases cover NV12/I420, all four rotations, SIMD and tile boundaries, shared-memory output and native consumption acknowledgements.
 - The Windows H.264 decoder produced all 60 frames in the 1080p60 fixture and all 30 frames in the 4K30 fixture. Processing including helper startup took approximately 0.88 s and 0.81 s respectively on the test machine. These short synthetic samples do not establish sustained real-world fps.

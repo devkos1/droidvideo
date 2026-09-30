@@ -31,6 +31,8 @@ async function startServer(options = {}) {
   const adb = options.adb || new Adb(options.adbPath);
   const usbRpc = options.phoneRequest || phoneRequest;
   const obsOutput=new ObsOutput(options.obsUdpPort||27187);
+  let previewEnabled=true;
+  const setPreview=enabled=>{previewEnabled=!!enabled;sendState();if(previewEnabled){for(const client of ws.clients){client.waitingKey=true;if(codecConfig&&client.readyState===WebSocket.OPEN)client.send(codecConfig);}keyFrame();}};
   let pair = null, transport = 'usb', networkTest = null, cameraCatalog = [];
   const rpc = (port,endpoint,body) => pair ? (options.wifiRequest || wifiRequest)(pair,endpoint,body) : usbRpc(port,endpoint,body);
   const token = crypto.randomBytes(24).toString('hex');
@@ -42,7 +44,7 @@ async function startServer(options = {}) {
   const keyFrame = () => { if (controlPort) rpc(controlPort, '/keyframe').catch(() => {}); };
   const virtual = new VirtualCamera(options.nativePath || path.resolve(__dirname,'../native/build'),()=>sendState(),keyFrame);
   const frameWs = new WebSocketServer({noServer:true,maxPayload:24*1024*1024,perMessageDeflate:false});
-  const state = () => ({components:options.components?.status()||{available:false},virtualCamera:virtual.status(),type:'status',connected,status:lastStatus,error:streamError,transport,networkTest});
+  const state = () => ({previewEnabled,backgroundAvailable:!!options.enterBackground,components:options.components?.status()||{available:false},virtualCamera:virtual.status(),type:'status',connected,status:lastStatus,error:streamError,transport,networkTest});
   const sendState = () => { for (const client of ws.clients) if (client.readyState === WebSocket.OPEN) client.send(JSON.stringify(state())); };
 
   function packetReceived({ flags, timestamp, data, packet }) {
@@ -53,6 +55,7 @@ async function startServer(options = {}) {
       for (const client of [...ws.clients, ...tcpClients]) client.waitingKey = true;
     }
     for (const client of ws.clients) {
+      if(!previewEnabled)continue;
       if (client.readyState !== WebSocket.OPEN) continue;
       if (client.bufferedAmount > 2 * 1024 * 1024) { client.terminate(); continue; }
       if (flags === 2) { client.send(packet); continue; }
@@ -138,7 +141,7 @@ async function startServer(options = {}) {
     let url;
     try { url = new URL(req.url, base); } catch { return json(400, { error: 'Invalid URL' }); }
     if (req.method === 'GET' && url.pathname === '/api/bootstrap') {
-      return json(200, { token, obsSource:'DroidVideo Camera + Audio', version: '0.3.1' });
+      return json(200, { token, obsSource:'DroidVideo Camera + Audio', version: '0.3.2' });
     }
     if (url.pathname.startsWith('/api/')) {
       if (req.method !== 'POST' || req.headers['x-droidvideo-token'] !== token || (req.headers.origin && req.headers.origin !== base)) return json(403, { error: 'Invalid session' });
@@ -190,6 +193,13 @@ async function startServer(options = {}) {
               await virtual.start();
             }else virtual.stop();
             value=virtual.status();break;
+          case '/preview': setPreview(body.enabled);value=state();break;
+          case '/background':
+            if(!options.enterBackground)throw new Error('Background mode is available in the Windows app.');
+            setPreview(false);options.enterBackground();value=state();break;
+          case '/setup-camera':
+            if(!options.components)throw new Error('Open the Windows app to install the camera.');
+            value=await options.components.install('Camera');sendState();break;
           case '/setup-obs':
             if(!options.components)throw new Error('Open the DroidVideo Windows app to install the OBS plug-in.');
             value=await options.components.install('OBS');sendState();break;
@@ -259,7 +269,7 @@ async function startServer(options = {}) {
   try { await listen(server, options.port ?? 27186); }
   catch (e) { tcp.close(); obsOutput.close(); throw e; }
   return {
-    url: `http://127.0.0.1:${server.address().port}`, pipePath,
+    url: `http://127.0.0.1:${server.address().port}`, pipePath,setPreview,
     async close() {
       closing = true; await disconnect();obsOutput.close();
       for (const client of ws.clients) client.terminate();

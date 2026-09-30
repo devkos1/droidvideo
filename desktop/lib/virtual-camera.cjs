@@ -11,7 +11,7 @@ function validateFrame(data) {
 }
 class VirtualCamera {
   constructor(directory,onChange=()=>{},requestKey=()=>{}) {this.directory=directory;this.onChange=onChange;this.requestKey=requestKey;this.process=null;this.error='';this.pending=null;this.frames=0;this.config=null;this.mode='native-h264';this.waitingKey=true;this.inFlight=0;}
-  status(){return {enabled:!!this.process,available:fs.existsSync(path.join(this.directory,'droidvideo-vcam-writer.exe')),mode:this.mode,error:this.error,frames:this.frames};}
+  status(){return {enabled:!!this.process,available:fs.existsSync(path.join(this.directory,'droidvideo-vcam-writer.exe')),mode:this.mode,decoder:this.decoder||'starting',error:this.error,frames:this.frames};}
   async start({raw=false}={}){
     if(this.process)return;
     const executable=path.join(this.directory,'droidvideo-vcam-writer.exe');
@@ -21,7 +21,7 @@ class VirtualCamera {
     child.stdin.on('error',e=>{if(this.process===child){this.error=e.message;this.onChange();}});
     child.stdout.on('data',data=>{if(this.process!==child)return;
       if(raw&&this.pending){if(data[0])this.frames++;this.finish(!!data[0]);}
-      else if(!raw){for(const byte of data)if(byte===1){this.frames++;this.inFlight=Math.max(0,this.inFlight-1);}}
+      else if(!raw){for(const byte of data){if(byte===1){this.frames++;this.inFlight=Math.max(0,this.inFlight-1);}else if(byte===72||byte===83){this.decoder=byte===72?'D3D11':'software';this.onChange();}}}
     });
     child.stderr.on('data',data=>{if(this.process===child){this.error=data.toString().slice(0,500);this.onChange();}});
     child.on('close',code=>{if(this.process===child){this.process=null;this.finish(false);if(code)this.error||=`Virtual camera exited (${code})`;this.onChange();}});

@@ -10,12 +10,20 @@ Stream your Android camera and microphone over USB or Wi-Fi to OBS Studio or a W
 
 ## Download just two files
 
-[**Download DroidVideo 0.3.1**](https://github.com/devkos1/droidvideo/releases/tag/v0.3.1)
+[**Download DroidVideo 0.3.2**](https://github.com/devkos1/droidvideo/releases/tag/v0.3.2)
 
 - **Android APK** → put this on your phone.
 - **Windows EXE** → open this on your PC. ADB, the OBS plug-in and the virtual camera are already inside. No extra ZIP or command line needed.
 
 You need Android 9+ and Windows 10/11 (64-bit). For OBS streaming, install OBS Studio 32.x (64-bit) if you do not already have it.
+
+## Guided setup and background mode
+
+When the Windows app opens, choose **OBS Studio** or **Other camera app** in the setup window. Follow the PC installation and phone connection steps. You can reopen the guide from the sidebar.
+
+Once video is running, click **Run in background**. DroidVideo stays in the Windows system tray and stops decoding its own preview; OBS and virtual camera output continue. Double-click the tray icon to return, or right-click it to quit. **Pause preview** does the same preview saving while keeping the controls visible.
+
+If Android installation reports insufficient storage, free internal space in **Android Settings → Storage**, then retry. DroidVideo never removes your files to make room. If the phone app is missing, install it before connecting.
 
 ## Get your picture on the PC
 
