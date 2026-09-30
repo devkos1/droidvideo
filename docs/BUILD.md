@@ -19,7 +19,7 @@ Expected commit: `5533a277e4400203b50114c993f89878d50a27b9`. `build-native.ps1` 
 .\tools\build.ps1
 ```
 
-The script builds/lints Android, runs desktop tests, builds and checks native components, creates corresponding source, prepares bundled ADB/components/notices, then packages and checks Windows. Outputs: `dist/DroidVideo-0.3.0-Android.apk` and `dist/windows/DroidVideo-0.3.0-Windows.exe`.
+The script builds/lints Android, runs desktop tests, builds and checks native components, creates corresponding source, prepares bundled ADB/components/notices, then packages and checks Windows. Outputs: `dist/DroidVideo-0.3.1-Android.apk` and `dist/windows/DroidVideo-0.3.1-Windows.exe`.
 
 `prepare-bundle.ps1` downloads the pinned official ADB archive and verifies SHA-256 before extraction. Only ADB, its two USB libraries and notices are included. The EXE also contains the OBS plug-in, DirectShow camera, frame writer, installer script and source archive. No separate component ZIP is needed. Internet is needed at build time; app setup does not download these components.
 
@@ -44,6 +44,8 @@ node tools/verify-media.cjs
 python -X utf8 tools/benchmark-vcam.py
 ```
 
-Native checks do not install/register a camera or modify OBS. The benchmark measures raw-pipe conversion/rotation/shared-memory throughput, not phone or OBS performance. `preview-fixture.cjs` serves explicitly labelled synthetic video on port 28186; it is excluded from the packaged app. Production uses port 27186. Do not run fixture and production together: both use the OBS pipe.
+Native checks do not install/register a camera or modify OBS. The benchmark measures raw-pipe conversion/rotation/shared-memory throughput, not phone or OBS performance. `preview-fixture.cjs` serves explicitly labelled synthetic video on port 28186; it is excluded from the packaged app. Production uses port 27186. Do not run fixture and production together: both use the OBS loopback UDP port 27187. The plug-in shares one FFmpeg decoder per OBS process, uses bounded UDP buffers and disables video buffering. The legacy named pipe remains for older plug-ins.
 
 To regenerate icons, install Pillow and run `python -X utf8 tools/build-icons.py`. Keep licenses, modified native source and corresponding build scripts with binary redistributions. **Licenses & source** in the app opens the bundled copy.
+
+To verify the new OBS loopback transport, run `node tools/verify-media.cjs`, then `node tools/verify-obs-transport.cjs <fixture-directory>` with the printed directory. This uses FFmpeg and isolated UDP port 28187. `python tools/verify-obs.py` checks shared decoder ownership and idle shutdown against the installed libobs without changing OBS settings.

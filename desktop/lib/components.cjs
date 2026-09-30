@@ -31,7 +31,10 @@ class Components {
       if(registered&&fs.existsSync(path.join(registered,'bin','64bit','obs64.exe')))this.obsRoot=registered;
     }
     const camera=await this.registry('HKCR\\CLSID\\{7B9F2D13-E481-4EA5-A853-4D706FE1A299}\\InprocServer32');
-    this.current.cameraInstalled=!!camera&&sameFile(camera,path.join(this.directory,'droidvideo-camera.dll'));
+    // Releases using this CLSID share camera ABI 1. A different PE build hash
+    // is not a reason to overwrite a compatible DLL loaded by a camera app.
+    this.current.cameraInstalled=!!camera&&path.basename(camera).toLowerCase()==='droidvideo-camera.dll'&&fs.existsSync(camera);
+    this.current.cameraUpdateAvailable=this.current.cameraInstalled&&!sameFile(camera,path.join(this.directory,'droidvideo-camera.dll'));
     this.current.obsInstalled=sameFile(path.join(this.obsRoot,'obs-plugins','64bit','droidvideo-obs.dll'),path.join(this.directory,'droidvideo-obs.dll'));
     return this.status();
   }
@@ -43,6 +46,7 @@ class Components {
     let temporary;
     try {
       await this.refresh();
+      if(component==='Camera'&&this.current.cameraInstalled)return this.status();
       if(component==='OBS'&&!fs.existsSync(path.join(this.obsRoot,'bin','64bit','obs64.exe'))){
         const selected=await this.chooseObsRoot();
         if(!selected)throw new Error('Install OBS Studio first, then try again.');

@@ -11,17 +11,18 @@ test('bundled ADB wins over SDK paths, with an explicit override available',t=>{
 });
 test('setup validates component, verifies installed bytes, and rejects cancelled elevation',async t=>{
   const directory=fs.mkdtempSync(path.join(os.tmpdir(),'dv-setup-test-'));
-  const names=['Install-Components.ps1','droidvideo-camera.dll','registered.dll'];
+  const names=['Install-Components.ps1','droidvideo-camera.dll','installed/droidvideo-camera.dll'];
+  fs.mkdirSync(path.join(directory,'installed'));
   names.forEach(n=>fs.writeFileSync(path.join(directory,n),'fixture'));
-  t.after(()=>{names.forEach(n=>fs.unlinkSync(path.join(directory,n)));fs.rmdirSync(directory);});
+  t.after(()=>{names.forEach(n=>fs.unlinkSync(path.join(directory,n)));fs.rmdirSync(path.join(directory,'installed'));fs.rmdirSync(directory);});
   let elevate=0;
   const manager=new Components(directory,{run:async(exe,args)=>{
-    if(exe.endsWith('reg.exe'))return {stdout:args[1].includes('InprocServer32')?`(Default) REG_SZ ${path.join(directory,'registered.dll')}`:''};
+    if(exe.endsWith('reg.exe'))return {stdout:args[1].includes('InprocServer32')?`(Default) REG_SZ ${path.join(directory,'installed/droidvideo-camera.dll')}`:''};
     elevate++;throw {stderr:'Windows setup permission was cancelled or could not be requested.'};
   }});
   assert.equal((await manager.refresh()).cameraInstalled,true);
-  fs.writeFileSync(path.join(directory,'registered.dll'),'older version');
-  assert.equal((await manager.refresh()).cameraInstalled,false);
+  fs.writeFileSync(path.join(directory,'installed/droidvideo-camera.dll'),'older version');
+  assert.equal((await manager.refresh()).cameraInstalled,true);assert.equal(manager.status().cameraUpdateAvailable,true);await manager.install('Camera');assert.equal(elevate,0);fs.unlinkSync(path.join(directory,'installed/droidvideo-camera.dll'));names.pop();
   await assert.rejects(manager.install('Camera'),/cancelled/);assert.equal(elevate,1);assert.equal(manager.status().installing,false);
   await assert.rejects(manager.install('arbitrary'),/Unknown component/);assert.equal(elevate,1);
 });

@@ -9,6 +9,7 @@ const { VirtualCamera } = require('./lib/virtual-camera.cjs');
 const { Adb } = require('./lib/adb.cjs');
 const { PacketParser } = require('./lib/protocol.cjs');
 const { MpegTsMuxer } = require('./lib/mpegts.cjs');
+const {ObsOutput}=require('./lib/obs-output.cjs');
 const { parsePairing,pinnedSocket,wifiRequest,measureWifi } = require('./lib/wifi.cjs');
 
 function phoneRequest(port, endpoint, body = {}) {
@@ -29,6 +30,7 @@ function phoneRequest(port, endpoint, body = {}) {
 async function startServer(options = {}) {
   const adb = options.adb || new Adb(options.adbPath);
   const usbRpc = options.phoneRequest || phoneRequest;
+  const obsOutput=new ObsOutput(options.obsUdpPort||27187);
   let pair = null, transport = 'usb', networkTest = null, cameraCatalog = [];
   const rpc = (port,endpoint,body) => pair ? (options.wifiRequest || wifiRequest)(pair,endpoint,body) : usbRpc(port,endpoint,body);
   const token = crypto.randomBytes(24).toString('hex');
@@ -44,6 +46,7 @@ async function startServer(options = {}) {
   const sendState = () => { for (const client of ws.clients) if (client.readyState === WebSocket.OPEN) client.send(JSON.stringify(state())); };
 
   function packetReceived({ flags, timestamp, data, packet }) {
+    obsOutput.packet(flags,data,timestamp);
     virtual.encoded(flags,data,lastStatus);
     if (flags === 2) {
       codecConfig = Buffer.from(packet);
@@ -77,7 +80,7 @@ async function startServer(options = {}) {
     socket.on('error', e => { streamError = `Video connection: ${e.message}`; });
     socket.on('close', () => {
       if (upstream !== socket) return;
-      upstream = null; codecConfig = null;virtual.reset();
+      upstream = null; codecConfig = null;virtual.reset();obsOutput.reset();
       for (const client of ws.clients) client.waitingKey = true;
       for (const client of tcpClients) client.destroy();
       sendState();
@@ -85,7 +88,7 @@ async function startServer(options = {}) {
     });
   }
   async function disconnect() {
-    virtual.stop();virtual.reset();
+    virtual.stop();virtual.reset();obsOutput.reset();
     connected = false; clearTimeout(reconnectTimer); clearInterval(monitor); monitor = null;
     const port = controlPort; controlPort = null; videoPort = null; serial = null;
     if (upstream) { const old = upstream; upstream = null; old.destroy(); }
@@ -122,7 +125,8 @@ async function startServer(options = {}) {
     client.on('error', () => {}); client.on('close', () => tcpClients.delete(client)); keyFrame();
   });
   const pipePath=options.pipePath || (process.platform==='win32' ? '\\\\.\\pipe\\DroidVideo.OBS' : '/tmp/droidvideo-obs-'+process.pid+'.sock');
-  await new Promise((resolve,reject)=>{tcp.once('error',reject);tcp.listen(pipePath,resolve);});
+  try { await new Promise((resolve,reject)=>{tcp.once('error',reject);tcp.listen(pipePath,resolve);}); }
+  catch(e){obsOutput.close();throw e;}
 
   const server = http.createServer(async (req, res) => {
     const base = `http://127.0.0.1:${server.address().port}`;
@@ -134,7 +138,7 @@ async function startServer(options = {}) {
     let url;
     try { url = new URL(req.url, base); } catch { return json(400, { error: 'Invalid URL' }); }
     if (req.method === 'GET' && url.pathname === '/api/bootstrap') {
-      return json(200, { token, obsSource:'DroidVideo Camera + Audio', version: '0.3.0' });
+      return json(200, { token, obsSource:'DroidVideo Camera + Audio', version: '0.3.1' });
     }
     if (url.pathname.startsWith('/api/')) {
       if (req.method !== 'POST' || req.headers['x-droidvideo-token'] !== token || (req.headers.origin && req.headers.origin !== base)) return json(403, { error: 'Invalid session' });
@@ -212,7 +216,7 @@ async function startServer(options = {}) {
               // A new encoder session may restart its clock and SPS. OBS must
               // receive a fresh transport stream, not a discontinuous old PES.
               for (const client of tcpClients) client.destroy();
-              codecConfig = null;virtual.reset();
+              codecConfig = null;virtual.reset();obsOutput.reset();
               for (const client of ws.clients) client.waitingKey = true;
             }
             value = await rpc(controlPort, route, body);lastStatus = await rpc(controlPort,'/status');if(route==='/stop')virtual.stop();sendState();break;
@@ -253,11 +257,11 @@ async function startServer(options = {}) {
     });
   });
   try { await listen(server, options.port ?? 27186); }
-  catch (e) { tcp.close(); throw e; }
+  catch (e) { tcp.close(); obsOutput.close(); throw e; }
   return {
     url: `http://127.0.0.1:${server.address().port}`, pipePath,
     async close() {
-      closing = true; await disconnect();
+      closing = true; await disconnect();obsOutput.close();
       for (const client of ws.clients) client.terminate();
       for(const client of frameWs.clients)client.terminate();frameWs.close();
       ws.close(); server.closeAllConnections();

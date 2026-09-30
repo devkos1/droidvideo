@@ -1,11 +1,14 @@
-# Verification report — 0.3.0 preview
+# Verification report — 0.3.1 preview
 
-Windows x64, September 29, 2026. Video fixtures are synthetic. [Magyar változat](TESTING.hu.md).
+Windows x64, September 30, 2026. Video fixtures are synthetic. [Magyar változat](TESTING.hu.md).
 
 ## Changes verified
 
-- Android `assembleDebug` and `lintDebug` passed. APK versionCode 3 / versionName 0.3.0; the existing development signature is retained for updates.
-- Sixteen Node tests passed, including protocol framing, MPEG-TS, USB/Wi-Fi controls, pairing, bounded native decode input, stale-frame rejection, setup endpoint authentication, bundled ADB selection, installer argument quoting and cancelled elevation. Installer tests use mocks; they do not register components.
+- The OBS plug-in uses bounded loopback UDP with hardware decoding enabled and asynchronous buffering disabled. Two sources share one decoder; repeated settings updates preserve it. An isolated libobs test closes the sources and shuts down without incoming video within a three-second limit. This is a regression check, not proof of real-device latency or stability.
+- Compatible registered camera DLLs are reused even when their build hashes differ. Explicit installation uses versioned paths, avoiding replacement of loaded DLLs. Detection is tested with mocks; elevated installation still needs device testing.
+
+- Android `assembleDebug` and `lintDebug` passed. APK versionCode 4 / versionName 0.3.1; the existing development signature is retained for updates.
+- Seventeen Node tests passed, including protocol framing, MPEG-TS, USB/Wi-Fi controls, pairing, bounded native decode input, stale-frame rejection, setup endpoint authentication, bundled ADB selection, installer argument quoting and cancelled elevation. Installer tests use mocks; they do not register components.
 - Native x64 build passed. DirectShow COM creation and 1080p60/4K30 formats work without camera registration.
 - Sixteen pixel-exact raw-frame cases cover NV12/I420, all four rotations, SIMD and tile boundaries, shared-memory output and native consumption acknowledgements.
 - The Windows H.264 decoder produced all 60 frames in the 1080p60 fixture and all 30 frames in the 4K30 fixture. Processing including helper startup took approximately 0.88 s and 0.81 s respectively on the test machine. These short synthetic samples do not establish sustained real-world fps.
@@ -14,7 +17,9 @@ Windows x64, September 29, 2026. Video fixtures are synthetic. [Magyar változat
 - English and optional Hungarian UI, 4K preview, output controls and the simpler OBS setup dialog were checked in the browser.
 - The OBS module loaded into OBS 32.2.2 libobs and registered the source and audio properties. This is not a live OBS scene test.
 
-## Raw-frame processing comparison
+The loopback transport also decoded synthetic 1080p60 and 4K30 video with AAC using the production low-buffer settings, without receive-buffer overruns or decoding errors. These five-second runs validate packet delivery, not sustained phone-to-OBS performance.
+
+## Raw-frame processing comparison (0.3.0 baseline)
 
 The same local 30-frame 3840×2160 I420 test, including pipe input, conversion, rotation and shared-memory output:
 

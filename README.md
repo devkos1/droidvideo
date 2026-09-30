@@ -1,14 +1,16 @@
-# DroidVideo
+# DroidVideo — Free Android Webcam for Windows and OBS
 
 <img src="assets/branding/icon.svg" width="96" height="96" alt="DroidVideo camera icon">
 
 **Use your Android phone as a Windows camera. Free. Open source. No watermark.**
 
-Made by **devkos1**. English by default; [magyar útmutató](docs/SETUP.hu.md).
+Stream your Android camera and microphone over USB or Wi-Fi to OBS Studio or a Windows virtual camera. Choose 4K30 or 1080p60 on supported devices.
+
+[Project website](https://devkos1.github.io/droidvideo/) · Made by **devkos1**. English by default; [magyar útmutató](docs/SETUP.hu.md).
 
 ## Download just two files
 
-[**Download DroidVideo 0.3.0**](https://github.com/devkos1/droidvideo/releases/tag/v0.3.0)
+[**Download DroidVideo 0.3.1**](https://github.com/devkos1/droidvideo/releases/tag/v0.3.1)
 
 - **Android APK** → put this on your phone.
 - **Windows EXE** → open this on your PC. ADB, the OBS plug-in and the virtual camera are already inside. No extra ZIP or command line needed.
@@ -25,6 +27,10 @@ You need Android 9+ and Windows 10/11 (64-bit). For OBS streaming, install OBS S
 **Where is USB debugging?** Open the phone's Settings → About phone and tap **Build number** seven times. Go back, find **Developer options**, then turn on **USB debugging**. Names vary by phone. Some phones need their manufacturer's USB driver; if Windows cannot see yours, use Wi-Fi instead.
 
 **Prefer Wi-Fi?** Connect both devices to the same Wi-Fi. In the phone app, turn on Wi-Fi sharing and copy its pairing link. In the Windows app, choose Wi-Fi, paste the link and click Connect. DroidVideo measures the connection and recommends a quality setting.
+
+## Updating from an older version
+
+Download the new APK and EXE. Close OBS completely, open the new EXE, then click **Setup → Install OBS plug-in** before reopening OBS. This installs the latency and freeze fixes. You can keep the existing compatible virtual camera installed; enabling it no longer overwrites its DLL.
 
 ## Use it in OBS
 

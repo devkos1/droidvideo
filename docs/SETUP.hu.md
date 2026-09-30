@@ -4,7 +4,7 @@ A telefonod kamerája a számítógépeden. Ingyenes, nyílt forráskódú, víz
 
 ## Csak két fájl kell
 
-A [letöltési oldalon](https://github.com/devkos1/droidvideo/releases/tag/v0.3.0) töltsd le az **APK-t a telefonodra**, az **EXE-t a számítógépedre**. Az EXE-ben benne van az ADB, az OBS-bővítmény és a virtuális kamera. Külön ZIP-re vagy parancssorra nincs szükség.
+A [letöltési oldalon](https://github.com/devkos1/droidvideo/releases/tag/v0.3.1) töltsd le az **APK-t a telefonodra**, az **EXE-t a számítógépedre**. Az EXE-ben benne van az ADB, az OBS-bővítmény és a virtuális kamera. Külön ZIP-re vagy parancssorra nincs szükség.
 
 Android 9 vagy újabb, illetve 64 bites Windows 10/11 szükséges. OBS-adáshoz OBS Studio 32.x 64 bit kell. Az alapnyelv angol; az EN/HU gombbal válthatsz magyarra.
 
@@ -43,3 +43,7 @@ Ez csak képet ad; hanghoz más appban a PC mikrofonját használd. A kamera 64 
 - A párosítási linket ne oszd meg másokkal. A kép és hang a saját eszközeiden és helyi hálózatodon marad.
 
 Ez előzetes kiadás. A Windows EXE még nincs hiteles tanúsítvánnyal aláírva, ezért megjelenhet ismeretlen kiadóra vagy SmartScreenre vonatkozó figyelmeztetés. A szerzőnév nem helyettesíti a digitális aláírást. Ne kapcsold ki a rendszer biztonsági védelmét. [Ellenőrzési állapot](TESTING.hu.md).
+
+## Frissítés 0.3.1-re
+
+Zárd be teljesen az OBS-t. Nyisd meg az új EXE-t, majd a Setup résznél telepítsd újra az OBS-bővítményt. Ezután indítsd újra az OBS-t. A már telepített kompatibilis virtuális kamerát a program újratelepítés nélkül használja.
