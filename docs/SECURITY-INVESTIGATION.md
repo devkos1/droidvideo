@@ -10,8 +10,20 @@ not evidence that 62 distinct files contain malware.
 
 Reported processes include the portable launcher, its extracted `DroidVideo.exe`,
 bundled `adb.exe`, `droidvideo-audio-bridge.exe`, and Windows `powershell.exe`,
-`reg.exe` and `conhost.exe`. The screenshots do not show the attack timeline or
-the exact operation that first triggered the detection.
+`reg.exe` and `conhost.exe`.
+
+A subsequent timeline screenshot shows Explorer, the portable launcher and
+`DroidVideo.exe` in the process ancestry. Its labels put launcher/application
+startup around 13:13 and the detection at 13:24:04 on October 2, 2026. The selected
+event describes `userinit.exe` launching `explorer.exe`; the detection event's
+details are not selected. This establishes a later runtime detection, but does
+not identify the operation that triggered it or exclude delayed scoring of an
+earlier action.
+
+The local OBS log for the 13:13 session records a normal shutdown ending around
+13:20:05, before the displayed detection time. That log provides no observation
+of OBS behavior at 13:24:04. This timing does not establish that OBS caused the
+security event.
 
 [Bitdefender describes Advanced Threat Defense](https://www.bitdefender.com/consumer/support/answer/2024/)
 as behavior monitoring that combines multiple observations. A legitimate
@@ -45,7 +57,7 @@ script against release commit `b32d85e05eb88faef000ad157465c031376c23f3`.
 The local report stays in ignored `.build-deps/investigation/`.
 Matching hashes establish file identity, not safety or independent provenance.
 
-The event's attack timeline and a vendor assessment are still needed to classify
-the report. No antivirus exclusions, protection changes, quarantine restoration
+The selected detection event's description and a vendor assessment are still
+needed to classify the report. No antivirus exclusions, protection changes, quarantine restoration
 or repackaging to bypass detection are part of this investigation. Older releases
 have not been established as safe alternatives. Distribution remains paused.
