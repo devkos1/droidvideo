@@ -238,7 +238,7 @@ async function startServer(options = {}) {
               // A new encoder session may restart its clock and SPS. OBS must
               // receive a fresh transport stream, not a discontinuous old PES.
               for (const client of tcpClients) client.destroy();
-              codecConfig = null;virtual.reset();audioOutput.stop();
+              codecConfig = null;virtual.reset();if(route==='/start')audioOutput.reset();else audioOutput.stop();
               for (const client of ws.clients) client.waitingKey = true;
             }
             value = await rpc(controlPort, route, body);lastStatus = await rpc(controlPort,'/status');if(route==='/stop'){cameraRequested=false;virtual.stop();audioOutput.stop();}await maintainOutput();sendState();break;

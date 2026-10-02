@@ -6,7 +6,7 @@ document.querySelector('.preview-card').append($('microphoneControls').content.c
 let microphone={};
 function renderMicrophone(){
  $('setupMic').disabled=true;$('microphone').disabled=true;
- $('microphoneStatus').textContent=t('Native microphone driver in development. Phone audio in OBS remains available without a microphone driver.','A saját mikrofon-driver fejlesztés alatt áll. Az OBS telefonos hangjához nem kell mikrofon-driver.');
+ $('microphoneStatus').textContent=microphone.error||t('Native microphone driver in development. Phone audio in OBS remains available without a microphone driver.','A saját mikrofon-driver fejlesztés alatt áll. Az OBS telefonos hangjához nem kell mikrofon-driver.');
 }
 
 let bootstrap,connected=false,cameras=[],status=null,busy=false,player,sender,toastTimer,hasFrame=false,network=null,virtual={},components={},previewEnabled=true,backgroundAvailable=false,welcomeStep=0,welcomeOutput='OBS';

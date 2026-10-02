@@ -12,6 +12,8 @@ Stream your Android camera and microphone over USB or Wi-Fi to OBS Studio or a W
 
 **Version 0.3.3 has been withdrawn following a reported Bitdefender detection during setup. The detection has not yet been classified. Do not disable antivirus protection or add an exclusion to run it.** A replacement binary will not be published until the affected component is identified and reviewed.
 
+The reported event is Advanced Threat Defense `SuspiciousBehavior.2F8632572ABFA976`. See the [investigation status](docs/SECURITY-INVESTIGATION.md) for confirmed findings and remaining checks.
+
 ## Distribution format
 
 The 0.3.3 download is currently unavailable. Older releases are not a verified workaround.

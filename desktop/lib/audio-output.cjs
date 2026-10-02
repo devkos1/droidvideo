@@ -3,21 +3,25 @@ const {spawn}=require('node:child_process');
 const path=require('node:path');
 const fs=require('node:fs');
 class AudioOutput {
-  constructor(directory,onChange=()=>{}){this.executable=path.join(directory,'droidvideo-audio-bridge.exe');this.onChange=onChange;this.child=null;this.enabled=false;this.error='';this.retryAt=0;this.pending=0;this.ready=false;}
+  constructor(directory,onChange=()=>{},{launch=spawn,exists=fs.existsSync}={}){this.executable=path.join(directory,'droidvideo-audio-bridge.exe');this.onChange=onChange;this.launch=launch;this.exists=exists;this.child=null;this.enabled=false;this.error='';this.failed=false;this.pending=0;this.ready=false;}
   status(){return {enabled:this.enabled,error:this.error};}
-  setEnabled(enabled){this.enabled=!!enabled;this.error='';this.retryAt=0;this.stop();this.onChange();}
+  reset(){this.stop();this.failed=false;this.error='';this.onChange();}
+  setEnabled(enabled){this.enabled=!!enabled;this.reset();}
+  fail(message){this.failed=true;this.ready=false;this.enabled=false;this.error=message;this.onChange();}
   start(){
-    if(this.child||Date.now()<this.retryAt||!fs.existsSync(this.executable))return;
-    this.stopping=false;this.retryAt=Date.now()+5000;this.ready=false;this.pending=0;
-    const child=spawn(this.executable,[],{windowsHide:true,stdio:['pipe','pipe','pipe']});this.child=child;
-    child.stdout.on('data',data=>{if(this.child!==child||this.stopping)return;for(const b of data){if(b===82)this.ready=true;if(b===65)this.pending=Math.max(0,this.pending-1);}});
-    child.stderr.on('data',data=>{this.error=data.toString().trim().slice(0,500);this.onChange();});
-    child.on('error',e=>{this.error=e.message;this.onChange();});child.stdin.on('error',()=>{});
-    child.on('close',code=>{if(this.child===child){this.child=null;this.ready=false;if(code){this.error||='Phone audio stopped. Try enabling it again.';if(this.enabled){this.enabled=false;this.retryAt=0;}}this.onChange();}});
+    if(this.child||this.failed)return;
+    if(!this.exists(this.executable)){this.fail('Phone audio helper is missing. Audio has stopped.');return;}
+    this.stopping=false;this.ready=false;this.pending=0;
+    let child;try{child=this.launch(this.executable,[],{windowsHide:true,stdio:['pipe','pipe','pipe']});}catch(e){this.fail(e.message);return;}this.child=child;
+    const startup=setTimeout(()=>{if(this.child===child&&!this.stopping&&!this.ready){this.fail('Phone audio helper did not start. Audio has stopped.');child.kill();}},10000);startup.unref();
+    child.stdout.on('data',data=>{if(this.child!==child||this.stopping||this.failed)return;for(const b of data){if(b===82){this.ready=true;clearTimeout(startup);}if(b===65)this.pending=Math.max(0,this.pending-1);}});
+    child.stderr.on('data',data=>{if(this.child===child&&!this.stopping){this.error=data.toString().trim().slice(0,500);this.onChange();}});
+    child.on('error',e=>{if(this.child===child&&!this.stopping)this.fail(e.message);});child.stdin.on('error',()=>{});
+    child.on('close',()=>{clearTimeout(startup);if(this.child===child){this.child=null;this.ready=false;if(!this.stopping)this.fail(this.error||'Phone audio helper stopped. Check the error before starting a new stream.');else this.onChange();}});
   }
   packet(data,timestamp){
     if(!this.child)this.start();
-    if(this.stopping||!this.child||!this.ready||this.pending>=8||this.child.stdin.writableLength>65536)return;
+    if(this.failed||this.stopping||!this.child||!this.ready||this.pending>=8||this.child.stdin.writableLength>65536)return;
     const header=Buffer.alloc(16);header.writeUInt32LE(0x41415644);header.writeUInt32LE(data.length,4);header.writeBigUInt64LE(BigInt(timestamp),8);this.pending++;
     this.child.stdin.write(Buffer.concat([header,data]));
   }
