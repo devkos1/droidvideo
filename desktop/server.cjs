@@ -9,7 +9,8 @@ const { VirtualCamera } = require('./lib/virtual-camera.cjs');
 const { Adb } = require('./lib/adb.cjs');
 const { PacketParser } = require('./lib/protocol.cjs');
 const { MpegTsMuxer } = require('./lib/mpegts.cjs');
-const {ObsOutput}=require('./lib/obs-output.cjs');
+const dgram=require('node:dgram');
+const {AudioOutput}=require('./lib/audio-output.cjs');
 const { parsePairing,pinnedSocket,wifiRequest,measureWifi } = require('./lib/wifi.cjs');
 
 function phoneRequest(port, endpoint, body = {}) {
@@ -30,7 +31,9 @@ function phoneRequest(port, endpoint, body = {}) {
 async function startServer(options = {}) {
   const adb = options.adb || new Adb(options.adbPath);
   const usbRpc = options.phoneRequest || phoneRequest;
-  const obsOutput=new ObsOutput(options.obsUdpPort||27187);
+  let cameraRequested=false,lastObs=0,decoderStarting=false,retryDecoderAt=0;
+  const heartbeat=dgram.createSocket('udp4');
+  let outputMonitor;
   let previewEnabled=true;
   const setPreview=enabled=>{previewEnabled=!!enabled;sendState();if(previewEnabled){for(const client of ws.clients){client.waitingKey=true;if(codecConfig&&client.readyState===WebSocket.OPEN)client.send(codecConfig);}keyFrame();}};
   let pair = null, transport = 'usb', networkTest = null, cameraCatalog = [];
@@ -42,13 +45,20 @@ async function startServer(options = {}) {
   const tcpClients = new Set();
   const ws = new WebSocketServer({ noServer: true, maxPayload: 1024 });
   const keyFrame = () => { if (controlPort) rpc(controlPort, '/keyframe').catch(() => {}); };
-  const virtual = new VirtualCamera(options.nativePath || path.resolve(__dirname,'../native/build'),()=>sendState(),keyFrame);
+  const virtual = options.virtualCamera || new VirtualCamera(options.nativePath || path.resolve(__dirname,'../native/build'),()=>sendState(),keyFrame);
+  const audioOutput=new AudioOutput(options.nativePath || path.resolve(__dirname,'../native/build'),()=>sendState());
+  async function maintainOutput(){
+    const wanted=!closing&&connected&&lastStatus?.phase==='streaming'&&(cameraRequested||Date.now()-lastObs<1800);
+    if(wanted&&!virtual.status().enabled&&!decoderStarting&&Date.now()>=retryDecoderAt){decoderStarting=true;try{await virtual.start();}catch(e){streamError=e.message;retryDecoderAt=Date.now()+5000;}finally{decoderStarting=false;}}
+    else if(!wanted&&virtual.status().enabled)virtual.stop();
+  }
+  heartbeat.on('message',(data,remote)=>{if(remote.address==='127.0.0.1'&&data.toString()==='DroidVideoDecoded1'){lastObs=Date.now();maintainOutput();}});
   const frameWs = new WebSocketServer({noServer:true,maxPayload:24*1024*1024,perMessageDeflate:false});
-  const state = () => ({previewEnabled,backgroundAvailable:!!options.enterBackground,components:options.components?.status()||{available:false},virtualCamera:virtual.status(),type:'status',connected,status:lastStatus,error:streamError,transport,networkTest});
+  const state = () => ({previewEnabled,backgroundAvailable:!!options.enterBackground,components:options.components?.status()||{available:false},virtualCamera:{...virtual.status(),enabled:cameraRequested},microphone:audioOutput.status(),type:'status',connected,status:lastStatus,error:streamError,transport,networkTest});
   const sendState = () => { for (const client of ws.clients) if (client.readyState === WebSocket.OPEN) client.send(JSON.stringify(state())); };
 
   function packetReceived({ flags, timestamp, data, packet }) {
-    obsOutput.packet(flags,data,timestamp);
+    if(flags===3)audioOutput.packet(data,timestamp);
     virtual.encoded(flags,data,lastStatus);
     if (flags === 2) {
       codecConfig = Buffer.from(packet);
@@ -83,7 +93,7 @@ async function startServer(options = {}) {
     socket.on('error', e => { streamError = `Video connection: ${e.message}`; });
     socket.on('close', () => {
       if (upstream !== socket) return;
-      upstream = null; codecConfig = null;virtual.reset();obsOutput.reset();
+      upstream = null; codecConfig = null;virtual.reset();audioOutput.stop();
       for (const client of ws.clients) client.waitingKey = true;
       for (const client of tcpClients) client.destroy();
       sendState();
@@ -91,7 +101,7 @@ async function startServer(options = {}) {
     });
   }
   async function disconnect() {
-    virtual.stop();virtual.reset();obsOutput.reset();
+    cameraRequested=false;virtual.stop();virtual.reset();audioOutput.setEnabled(false);
     connected = false; clearTimeout(reconnectTimer); clearInterval(monitor); monitor = null;
     const port = controlPort; controlPort = null; videoPort = null; serial = null;
     if (upstream) { const old = upstream; upstream = null; old.destroy(); }
@@ -110,7 +120,7 @@ async function startServer(options = {}) {
       if (port !== controlPort) return;
       lastStatus = status; missed = 0;
       if (status.phase !== 'streaming' && status.phase !== 'starting') {
-        if(virtual.status().enabled)virtual.stop();
+        cameraRequested=false;if(virtual.status().enabled)virtual.stop();audioOutput.stop();
         codecConfig = null;
         for (const client of tcpClients) client.destroy();
       }
@@ -129,7 +139,7 @@ async function startServer(options = {}) {
   });
   const pipePath=options.pipePath || (process.platform==='win32' ? '\\\\.\\pipe\\DroidVideo.OBS' : '/tmp/droidvideo-obs-'+process.pid+'.sock');
   try { await new Promise((resolve,reject)=>{tcp.once('error',reject);tcp.listen(pipePath,resolve);}); }
-  catch(e){obsOutput.close();throw e;}
+  catch(e){throw e;}
 
   const server = http.createServer(async (req, res) => {
     const base = `http://127.0.0.1:${server.address().port}`;
@@ -141,7 +151,7 @@ async function startServer(options = {}) {
     let url;
     try { url = new URL(req.url, base); } catch { return json(400, { error: 'Invalid URL' }); }
     if (req.method === 'GET' && url.pathname === '/api/bootstrap') {
-      return json(200, { token, obsSource:'DroidVideo Camera + Audio', version: '0.3.2' });
+      return json(200, { token, obsSource:'DroidVideo Camera + Audio', version: '0.3.3' });
     }
     if (url.pathname.startsWith('/api/')) {
       if (req.method !== 'POST' || req.headers['x-droidvideo-token'] !== token || (req.headers.origin && req.headers.origin !== base)) return json(403, { error: 'Invalid session' });
@@ -190,9 +200,21 @@ async function startServer(options = {}) {
             if(body.enabled) {
               if(!connected||lastStatus?.phase!=='streaming')throw new Error('Start the video first.');
               if(options.components){await options.components.refresh();if(!options.components.status().cameraInstalled)await options.components.install('Camera');}
-              await virtual.start();
-            }else virtual.stop();
-            value=virtual.status();break;
+              await virtual.start();cameraRequested=true;
+            }else {cameraRequested=false;await maintainOutput();}
+            value={...virtual.status(),enabled:cameraRequested};break;
+          case '/setup-microphone':
+            if(!options.components)throw new Error('Open the Windows app to set up the microphone.');
+            value=await options.components.install('Microphone');sendState();break;
+          case '/microphone':
+            if(body.enabled){
+              if(!connected||lastStatus?.phase!=='streaming'||lastStatus?.audioDevice==='off')throw new Error('Start video and choose a phone microphone first.');
+              if(options.components){await options.components.refresh();if(!options.components.status().microphoneInstalled)throw new Error('Set up DroidVideo Microphone first.');}
+            }
+            audioOutput.setEnabled(body.enabled);value=audioOutput.status();sendState();break;
+          case '/cable-info':
+            if(!options.openCableWebsite)throw new Error('Visit https://vb-audio.com/Cable/ for VB-CABLE information and donations.');
+            await options.openCableWebsite();value={opened:true};break;
           case '/preview': setPreview(body.enabled);value=state();break;
           case '/background':
             if(!options.enterBackground)throw new Error('Background mode is available in the Windows app.');
@@ -226,10 +248,10 @@ async function startServer(options = {}) {
               // A new encoder session may restart its clock and SPS. OBS must
               // receive a fresh transport stream, not a discontinuous old PES.
               for (const client of tcpClients) client.destroy();
-              codecConfig = null;virtual.reset();obsOutput.reset();
+              codecConfig = null;virtual.reset();audioOutput.stop();
               for (const client of ws.clients) client.waitingKey = true;
             }
-            value = await rpc(controlPort, route, body);lastStatus = await rpc(controlPort,'/status');if(route==='/stop')virtual.stop();sendState();break;
+            value = await rpc(controlPort, route, body);lastStatus = await rpc(controlPort,'/status');if(route==='/stop'){cameraRequested=false;virtual.stop();audioOutput.stop();}await maintainOutput();sendState();break;
           default: return json(404, { error: 'Unknown endpoint' });
         }
         json(200, value);
@@ -267,11 +289,15 @@ async function startServer(options = {}) {
     });
   });
   try { await listen(server, options.port ?? 27186); }
-  catch (e) { tcp.close(); obsOutput.close(); throw e; }
+  catch (e) { tcp.close(); throw e; }
+  try {await new Promise((resolve,reject)=>{heartbeat.once('error',reject);heartbeat.bind(options.obsHeartbeatPort??27190,'127.0.0.1',resolve);});}
+  catch(e){server.close();tcp.close();heartbeat.close();throw e;}
+  heartbeat.on('error',e=>{streamError='OBS connection: '+e.message;sendState();});
+  outputMonitor=setInterval(maintainOutput,500);
   return {
-    url: `http://127.0.0.1:${server.address().port}`, pipePath,setPreview,
+    url: `http://127.0.0.1:${server.address().port}`, pipePath,setPreview,obsHeartbeatPort:heartbeat.address().port,
     async close() {
-      closing = true; await disconnect();obsOutput.close();
+      closing = true;clearInterval(outputMonitor);heartbeat.close(); await disconnect();
       for (const client of ws.clients) client.terminate();
       for(const client of frameWs.clients)client.terminate();frameWs.close();
       ws.close(); server.closeAllConnections();

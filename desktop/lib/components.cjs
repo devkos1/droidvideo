@@ -9,7 +9,7 @@ const exec=promisify(execFile);
 const quote=value=>"'"+String(value).replaceAll("'","''")+"'";
 const encode=value=>Buffer.from(value,'utf16le').toString('base64');
 function elevationCommand(directory,component,obsRoot,resultFile){
-  if(!['Camera','OBS'].includes(component))throw new Error('Unknown component');
+  if(!['Camera','OBS','Microphone'].includes(component))throw new Error('Unknown component');
   const inner=`$ErrorActionPreference='Stop'; try { & ${quote(path.join(directory,'Install-Components.ps1'))} -Component ${quote(component)} -ObsRoot ${quote(obsRoot)}; exit 0 } catch { [IO.File]::WriteAllText(${quote(resultFile)},$_.Exception.Message); exit 1 }`;
   return encode(`try { $p=Start-Process -FilePath "$PSHOME\\powershell.exe" -ArgumentList @('-NoProfile','-NonInteractive','-ExecutionPolicy','RemoteSigned','-EncodedCommand',${quote(encode(inner))}) -Verb RunAs -WindowStyle Hidden -Wait -PassThru; exit $p.ExitCode } catch { [Console]::Error.WriteLine('Windows setup permission was cancelled or could not be requested.'); exit 1 }`);
 }
@@ -36,10 +36,17 @@ class Components {
     this.current.cameraInstalled=!!camera&&path.basename(camera).toLowerCase()==='droidvideo-camera.dll'&&fs.existsSync(camera);
     this.current.cameraUpdateAvailable=this.current.cameraInstalled&&!sameFile(camera,path.join(this.directory,'droidvideo-camera.dll'));
     this.current.obsInstalled=sameFile(path.join(this.obsRoot,'obs-plugins','64bit','droidvideo-obs.dll'),path.join(this.directory,'droidvideo-obs.dll'));
+    this.current.microphoneInstalled=false;
+    const helper=path.join(this.directory,'droidvideo-audio-bridge.exe');
+    if(fs.existsSync(helper))try{
+      const {stdout}=await this.run(helper,['--list'],{windowsHide:true,timeout:8000,maxBuffer:65536});
+      const capture=JSON.parse(stdout).filter(e=>e.cable&&e.capture);
+      this.current.microphoneInstalled=capture.length===1&&capture[0].name==='DroidVideo Microphone';
+    }catch{}
     return this.status();
   }
   async install(component){
-    if(!['Camera','OBS'].includes(component))throw new Error('Unknown component');
+    if(!['Camera','OBS','Microphone'].includes(component))throw new Error('Unknown component');
     if(!this.current.available)throw new Error('Open the bundled DroidVideo Windows app to run setup.');
     if(this.installing)throw new Error('Setup is already running.');
     this.installing=true;
@@ -55,10 +62,10 @@ class Components {
       }
       temporary=fs.mkdtempSync(path.join(os.tmpdir(),'droidvideo-setup-'));
       const result=path.join(temporary,'error.txt');
-      try {await this.run(path.join(process.env.SystemRoot||'C:\\Windows','System32','WindowsPowerShell','v1.0','powershell.exe'),['-NoProfile','-NonInteractive','-EncodedCommand',elevationCommand(this.directory,component,this.obsRoot,result)],{windowsHide:true,timeout:180000,maxBuffer:65536});}
+      try {await this.run(path.join(process.env.SystemRoot||'C:\\Windows','System32','WindowsPowerShell','v1.0','powershell.exe'),['-NoProfile','-NonInteractive','-EncodedCommand',elevationCommand(this.directory,component,this.obsRoot,result)],{windowsHide:true,timeout:600000,maxBuffer:65536});}
       catch(error){throw new Error(fs.existsSync(result)?fs.readFileSync(result,'utf8'):(error.stderr?.trim()||'Setup was not completed. Accept the Windows permission prompt to continue.'));}
       await this.refresh();
-      if(!this.current[component==='Camera'?'cameraInstalled':'obsInstalled'])throw new Error('Setup finished, but the component could not be verified. Close camera applications and try again.');
+      if(!this.current[component==='Camera'?'cameraInstalled':component==='OBS'?'obsInstalled':'microphoneInstalled'])throw new Error('Setup finished, but the component could not be verified. Restart Windows if requested, then try setup again.');
       return this.status();
     } finally {this.installing=false;if(temporary){const result=path.join(temporary,'error.txt');try{fs.unlinkSync(result);}catch{}try{fs.rmdirSync(temporary);}catch{}}}
   }

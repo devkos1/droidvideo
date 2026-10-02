@@ -15,8 +15,9 @@ test('authenticated USB lifecycle, WebSocket framing, OBS TS, and cleanup',async
   const rpc=async(port,endpoint)=>{ assert.equal(port,42); if(endpoint==='/cameras') return {cameras:[camera]}; if(endpoint==='/start') phase='streaming'; if(endpoint==='/stop') phase='idle'; return {phase}; };
   let installs=0;
   const components={status:()=>({available:true,obsInstalled:installs>0}),install:async name=>{assert.equal(name,'OBS');installs++;return components.status();}};
-  let hidden=false;
-  const server=await startServer({port:0,pipePath:process.platform==='win32'?'\\\\.\\pipe\\DroidVideo.Test-'+process.pid:'/tmp/dv-test-'+process.pid,adb,phoneRequest:rpc,components,enterBackground:()=>{hidden=true;}});
+  let hidden=false,output=false,starts=0;
+  const virtualCamera={status:()=>({enabled:output}),start:async()=>{output=true;starts++;},stop:()=>{output=false;},reset:()=>{},encoded:()=>{}};
+  const server=await startServer({port:0,obsHeartbeatPort:0,virtualCamera,pipePath:process.platform==='win32'?'\\\\.\\pipe\\DroidVideo.Test-'+process.pid:'/tmp/dv-test-'+process.pid,adb,phoneRequest:rpc,components,enterBackground:()=>{hidden=true;}});
   t.after(async()=>{await server.close(); if(phoneSocket)phoneSocket.destroy(); await new Promise(r=>source.close(r));});
   const boot=await fetch(server.url+'/api/bootstrap').then(r=>r.json());
   const post=(route,body={},extra={})=>fetch(server.url+'/api/'+route,{method:'POST',headers:{'X-DroidVideo-Token':boot.token,...extra},body:JSON.stringify(body)});
@@ -27,6 +28,11 @@ test('authenticated USB lifecycle, WebSocket framing, OBS TS, and cleanup',async
   assert.equal((await post('devices')).status,200);
   assert.equal((await post('connect',{serial:'USB123'})).status,200);
   assert.equal((await post('start',{cameraId:'0',mode:'1920x1080@60'})).status,200);
+  const heartbeat=require('node:dgram').createSocket('udp4');t.after(()=>heartbeat.close());
+  await new Promise((resolve,reject)=>heartbeat.send('DroidVideoDecoded1',server.obsHeartbeatPort,'127.0.0.1',e=>e?reject(e):resolve()));
+  await new Promise(r=>setTimeout(r,40));assert.equal(output,true);assert.equal(starts,1);
+  assert.equal((await post('status').then(r=>r.json())).virtualCamera.enabled,false);
+  await post('virtual-camera',{enabled:false});assert.equal(output,true,'OBS keeps its decoder when camera output is disabled');
   const ws=new WebSocket(server.url.replace('http:','ws:')+'/video?token='+boot.token); t.after(()=>ws.terminate()); await once(ws,'open');
   const raw=net.connect(server.pipePath); t.after(()=>raw.destroy()); await once(raw,'connect');
   const wsData=[],rawData=[]; ws.on('message',(data,binary)=>{if(binary)wsData.push(Buffer.from(data));}); raw.on('data',data=>rawData.push(data));
@@ -45,4 +51,5 @@ test('authenticated USB lifecycle, WebSocket framing, OBS TS, and cleanup',async
   await post('preview',{enabled:true});phoneSocket.write(key);await new Promise(r=>setTimeout(r,50));
   assert.ok(wsData.length>previous);assert.equal(wsData[previous][0],2);
   await post('disconnect'); assert.equal((await post('status').then(r=>r.json())).connected,false); assert.ok(disconnected>=2);
+  assert.equal(output,false);
 });

@@ -10,7 +10,7 @@ Stream your Android camera and microphone over USB or Wi-Fi to OBS Studio or a W
 
 ## Download just two files
 
-[**Download DroidVideo 0.3.2**](https://github.com/devkos1/droidvideo/releases/tag/v0.3.2)
+[**Download DroidVideo 0.3.3**](https://github.com/devkos1/droidvideo/releases/tag/v0.3.3)
 
 - **Android APK** → put this on your phone.
 - **Windows EXE** → open this on your PC. ADB, the OBS plug-in and the virtual camera are already inside. No extra ZIP or command line needed.
@@ -54,7 +54,15 @@ For sound, select a phone microphone in DroidVideo. In the OBS source settings, 
 
 Start video, then click **Enable** under **Windows virtual camera**. The first click installs the camera too; accept the Windows permission prompt. Open or restart your video app and choose **DroidVideo Camera**.
 
-The virtual camera carries picture only. Use your PC microphone for sound in other apps. It supports 64-bit DirectShow camera apps; not every Windows app supports this camera type. Keep DroidVideo running while using it.
+For phone sound in other apps:
+
+1. Under **DroidVideo Microphone**, click **Set up microphone**. In the VB-CABLE window, click **Install Driver**. Restart Windows if asked, then click **Set up microphone** again.
+2. Choose a **Phone microphone** in DroidVideo, start video, and click **Enable** under **DroidVideo Microphone**.
+3. In your calling or recording app, choose **DroidVideo Camera** for video and **DroidVideo Microphone** for sound.
+
+The optional microphone uses **VB-CABLE by VB-Audio**, a separate closed-source donationware driver included in the EXE. [Visit VB-Audio to donate or buy a license](https://vb-audio.com/Cable/); check its terms for professional use. [Details](docs/VB-CABLE.md). OBS's DroidVideo source receives phone audio directly and does not need this driver.
+
+The camera supports 64-bit DirectShow apps; not every Windows app supports this camera type. Keep DroidVideo running while using it.
 
 ## A few useful tips
 

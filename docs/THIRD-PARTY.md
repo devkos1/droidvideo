@@ -6,5 +6,6 @@ DroidVideo is maintained by **devkos1**. Third-party software retains its origin
 - Electron and Node.js carry their upstream notices in the Windows application distribution.
 - The OBS plug-in, virtual camera and native writer carry GPL/LGPL notices and matching source. See `native/THIRD-PARTY.md` in the source repository or `THIRD-PARTY.md` in the bundled licenses folder.
 - Original DroidVideo application code is MIT licensed.
+- The optional selectable microphone uses the unmodified standard VB-CABLE Driver Pack 45 by VB-Audio / Vincent Burel. It is closed-source donationware, not covered by DroidVideo's open-source licenses. [Origin, donations and licenses](https://vb-audio.com/Cable/) · [Bundling terms](https://vb-audio.com/Services/licensing.htm) · [Attribution and setup](VB-CABLE.md). The package SHA-256 is `b950e39f01af1d04ea623c8f6d8eb9b6ea5c477c637295fabf20631c85116bfb`. Original files and notices are preserved; A+B and C+D are not bundled.
 
 Use **Licenses & source** in the Windows application to open the bundled notices and source archive. Source is also available at https://github.com/devkos1/droidvideo. No third-party program is attributed to devkos1.

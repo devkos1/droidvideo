@@ -13,6 +13,7 @@ class VirtualCamera {
   constructor(directory,onChange=()=>{},requestKey=()=>{}) {this.directory=directory;this.onChange=onChange;this.requestKey=requestKey;this.process=null;this.error='';this.pending=null;this.frames=0;this.config=null;this.mode='native-h264';this.waitingKey=true;this.inFlight=0;}
   status(){return {enabled:!!this.process,available:fs.existsSync(path.join(this.directory,'droidvideo-vcam-writer.exe')),mode:this.mode,decoder:this.decoder||'starting',error:this.error,frames:this.frames};}
   async start({raw=false}={}){
+    if(this.stopping)await this.stopping;
     if(this.process)return;
     const executable=path.join(this.directory,'droidvideo-vcam-writer.exe');
     if(!fs.existsSync(executable))throw new Error('Build or install the Windows native components first.');
@@ -59,6 +60,6 @@ class VirtualCamera {
       child.stdin.write(data,error=>{if(error&&this.process===child){this.error=error.message;this.stop();}});
     });
   }
-  stop(){const child=this.process;this.process=null;this.finish(false);if(child){child.stdin.end();const timeout=setTimeout(()=>child.kill(),2000);timeout.unref();child.once('close',()=>clearTimeout(timeout));}this.onChange();}
+  stop(){const child=this.process;this.process=null;this.finish(false);if(child){this.stopping=new Promise(resolve=>child.once('close',()=>{this.stopping=null;resolve();}));child.stdin.end();const timeout=setTimeout(()=>child.kill(),2000);timeout.unref();child.once('close',()=>clearTimeout(timeout));}this.onChange();}
 }
 module.exports={VirtualCamera,validateFrame};

@@ -31,7 +31,15 @@ class Decoder {
     FrameOutput output;
     UINT32 width=0,height=0,fps=30,angle=0,decodedWidth=0,decodedHeight=0;
     LONGLONG time=0;
-    std::vector<uint8_t> contiguous;
+    std::vector<uint8_t> contiguous,cropped;
+    bool writeCpu(uint8_t *data){
+        auto uv=data+size_t(decodedWidth)*decodedHeight;
+        if(width==decodedWidth&&height==decodedHeight)return output.write(data,uv,width,height,fps,angle);
+        const size_t size=size_t(width)*height;cropped.resize(size*3/2);
+        for(UINT32 row=0;row<height;row++)memcpy(cropped.data()+size_t(row)*width,data+size_t(row)*decodedWidth,width);
+        for(UINT32 row=0;row<height/2;row++)memcpy(cropped.data()+size+size_t(row)*width,uv+size_t(row)*decodedWidth,width);
+        return output.write(cropped.data(),cropped.data()+size,width,height,fps,angle);
+    }
     void outputType(){
         reusableSample.Reset();staging.Reset();
         for(DWORD i=0;;++i){
@@ -41,6 +49,7 @@ class Decoder {
             checked(transform->SetOutputType(0,type.Get(),0));
             checked(MFGetAttributeSize(type.Get(),MF_MT_FRAME_SIZE,&decodedWidth,&decodedHeight));
             if(decodedWidth<2||decodedHeight<2||decodedWidth>4096||decodedHeight>4096||(decodedWidth&1)||(decodedHeight&1))throw std::runtime_error("Unsupported decoded frame dimensions.");
+            if(decodedWidth<width||decodedHeight<height)throw std::runtime_error("Decoded frame is smaller than the requested picture.");
             return;
         }
     }
@@ -55,12 +64,12 @@ class Decoder {
             if(!staging){desc.ArraySize=1;desc.MipLevels=1;desc.BindFlags=0;desc.MiscFlags=0;desc.Usage=D3D11_USAGE_STAGING;desc.CPUAccessFlags=D3D11_CPU_ACCESS_READ;checked(device->CreateTexture2D(&desc,nullptr,&staging));}
             context->CopySubresourceRegion(staging.Get(),0,0,0,0,texture.Get(),subresource,nullptr);
             D3D11_MAPPED_SUBRESOURCE mapped{};checked(context->Map(staging.Get(),0,D3D11_MAP_READ,0,&mapped));
-            const size_t size=size_t(decodedWidth)*decodedHeight;
+            const size_t size=size_t(width)*height;
             contiguous.resize(size*3/2);
-            for(UINT32 row=0;row<decodedHeight;row++)memcpy(contiguous.data()+size_t(row)*decodedWidth,static_cast<BYTE*>(mapped.pData)+size_t(row)*mapped.RowPitch,decodedWidth);
-            for(UINT32 row=0;row<decodedHeight/2;row++)memcpy(contiguous.data()+size+size_t(row)*decodedWidth,static_cast<BYTE*>(mapped.pData)+size_t(desc.Height+row)*mapped.RowPitch,decodedWidth);
+            for(UINT32 row=0;row<height;row++)memcpy(contiguous.data()+size_t(row)*width,static_cast<BYTE*>(mapped.pData)+size_t(row)*mapped.RowPitch,width);
+            for(UINT32 row=0;row<height/2;row++)memcpy(contiguous.data()+size+size_t(row)*width,static_cast<BYTE*>(mapped.pData)+size_t(desc.Height+row)*mapped.RowPitch,width);
             context->Unmap(staging.Get(),0);
-            if(output.write(contiguous.data(),contiguous.data()+size,decodedWidth,decodedHeight,fps,angle))signalFrame(1);
+            if(output.write(contiguous.data(),contiguous.data()+size,width,height,fps,angle))signalFrame(1);
             return;
         }
         ComPtr<IMFMediaBuffer> buffer;checked(sample->ConvertToContiguousBuffer(&buffer));
@@ -72,11 +81,11 @@ class Decoder {
             BYTE *data=nullptr;DWORD length=0;checked(buffer->Lock(&data,nullptr,&length));
             if(length<size){buffer->Unlock();throw std::runtime_error("Incomplete decoded camera frame.");}
             bool written=false;
-            try{written=output.write(data,data+size_t(decodedWidth)*decodedHeight,decodedWidth,decodedHeight,fps,angle);}
+            try{written=writeCpu(data);}
             catch(...){buffer->Unlock();throw;}
             checked(buffer->Unlock());if(written)signalFrame(1);return;
         }
-        if(output.write(contiguous.data(),contiguous.data()+size_t(decodedWidth)*decodedHeight,decodedWidth,decodedHeight,fps,angle))signalFrame(1);
+        if(writeCpu(contiguous.data()))signalFrame(1);
     }
 public:
     void configure(UINT32 w,UINT32 h,UINT32 rate,UINT32 rotation,bool reset){

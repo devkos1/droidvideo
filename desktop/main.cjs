@@ -16,7 +16,7 @@ else {
         return choice.canceled?null:choice.filePaths[0];
       }});
       await components.refresh();
-      backend = await startServer({components,enterBackground:()=>window?.hide(),openLicenses:()=>shell.openPath(path.join(resourceRoot,'licenses')),
+      backend = await startServer({components,openCableWebsite:()=>shell.openExternal('https://vb-audio.com/Cable/'),enterBackground:()=>window?.hide(),openLicenses:()=>shell.openPath(path.join(resourceRoot,'licenses')),
         adbPath:path.join(resourceRoot,'platform-tools','adb.exe'),
         nativePath:path.join(resourceRoot,'native'),
         apkPath:app.isPackaged?path.join(resourceRoot,'DroidVideo.apk'):undefined});

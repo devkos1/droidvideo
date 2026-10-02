@@ -23,7 +23,7 @@ source.listen(0,'127.0.0.1',async()=>{
   const camera={id:'test',label:'SZINTETIKUS TESZT · nem valódi telefon',minZoom:1,maxZoom:4,exposureMin:-3,exposureMax:3,focus:true,torch:false,
     modes:[{id:'1920x1080@60',label:'1080p / 60 fps'},{id:'3840x2160@30',label:'4K / 30 fps'}]};
   const status=()=>({phase,mode,width:mode.startsWith('3840')?3840:1920,height:mode.startsWith('3840')?2160:1080,targetFps:mode.endsWith('60')?60:30,rotation:0,measuredFps:total/Math.max(.001,(Date.now()-started)/1000),mbps:16,error:'',cameraId:'test'});
-  const server=await startServer({port:28486,obsUdpPort:28487,pipePath:process.platform==='win32'?'\\\\.\\pipe\\DroidVideo.Fixture-'+process.pid:'/tmp/dv-fixture-'+process.pid,adb:{devices:async()=>[{serial:'TEST-ONLY',state:'device',model:'Szintetikus tesztkamera'}],forward:async()=>[1,source.address().port],disconnect:async()=>{}},
+  const server=await startServer({port:28486,obsHeartbeatPort:28490,pipePath:process.platform==='win32'?'\\\\.\\pipe\\DroidVideo.Fixture-'+process.pid:'/tmp/dv-fixture-'+process.pid,adb:{devices:async()=>[{serial:'TEST-ONLY',state:'device',model:'Szintetikus tesztkamera'}],forward:async()=>[1,source.address().port],disconnect:async()=>{}},
     phoneRequest:async(_,route,body)=>{
       if(route==='/audio-inputs')return {devices:[{id:'off',label:'Off'},{id:'default',label:'Test microphone'}]};
       if(route==='/cameras')return {cameras:[camera]};

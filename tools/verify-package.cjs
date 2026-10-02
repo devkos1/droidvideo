@@ -10,7 +10,7 @@ for(const file of files)assert.ok(asar.extractFile(archive,file).equals(fs.readF
 const metadata=JSON.parse(asar.extractFile(archive,'package.json')),original=require('../desktop/package.json');
 for(const key of ['name','version','main','dependencies'])assert.deepEqual(metadata[key],original[key]);
 assert.equal(metadata.author.name||metadata.author,'devkos1');
-assert.deepEqual(fs.readFileSync(path.join(resources,'DroidVideo.apk')),fs.readFileSync(path.join(root,'dist/DroidVideo-0.3.2-Android.apk')));
+assert.deepEqual(fs.readFileSync(path.join(resources,'DroidVideo.apk')),fs.readFileSync(path.join(root,'dist/DroidVideo-0.3.3-Android.apk')));
 assert.deepEqual(fs.readFileSync(path.join(resources,'native/droidvideo-vcam-writer.exe')),fs.readFileSync(path.join(root,'native/build/droidvideo-vcam-writer.exe')));
 for(const file of ['droidvideo-obs.dll','droidvideo-camera.dll'])assert.deepEqual(fs.readFileSync(path.join(resources,'native',file)),fs.readFileSync(path.join(root,'native/build',file)));
 for(const folder of ['platform-tools','native','licenses']){
@@ -19,6 +19,6 @@ for(const folder of ['platform-tools','native','licenses']){
     if(fs.statSync(path.join(bundle,file)).isFile())assert.deepEqual(fs.readFileSync(path.join(resources,folder,file)),fs.readFileSync(path.join(bundle,file)),folder+'/'+file);
   }
 }
-assert.deepEqual(fs.readFileSync(path.join(resources,'licenses/DroidVideo-Source.zip')),fs.readFileSync(path.join(root,'dist/DroidVideo-0.3.2-Source.zip')));
+assert.deepEqual(fs.readFileSync(path.join(resources,'licenses/DroidVideo-Source.zip')),fs.readFileSync(path.join(root,'dist/DroidVideo-0.3.3-Source.zip')));
 const names=asar.listPackage(archive);assert.ok(!names.some(n=>n.endsWith('/obs.js')||n.endsWith('/obs.html')));
 console.log(`PASS packaged source (${files.length} files), devkos1 metadata, APK, ADB, both camera outputs, setup script, licenses and matching source archive`);

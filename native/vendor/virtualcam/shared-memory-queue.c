@@ -216,3 +216,9 @@ bool video_queue_read(video_queue_t *vq, nv12_scale_t *scale, void *dst, uint64_
 	nv12_do_scale(scale, dst, vq->frame[idx]);
 	return true;
 }
+
+bool video_queue_read_latest(video_queue_t *vq, nv12_scale_t *scale, void *dst, uint64_t *ts)
+{
+    if (vq->header->read_idx == (uint32_t)vq->last_inc) return false;
+    return video_queue_read(vq, scale, dst, ts);
+}
