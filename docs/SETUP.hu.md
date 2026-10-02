@@ -2,6 +2,10 @@
 
 A telefonod kamerája a számítógépeden. Ingyenes, nyílt forráskódú, vízjel nélkül. Készítő: **devkos1**.
 
+## A 0.3.3-as kiadás visszavonva
+
+Telepítés közbeni Bitdefender-találatot jelentettek; az okát még vizsgáljuk. Ne kapcsold ki a vírusvédelmet, és ne adj kivételt ehhez a verzióhoz. A régi kiadás sem ellenőrzött kerülőmegoldás.
+
 ## Csak két fájl kell
 
 A [letöltési oldalon](https://github.com/devkos1/droidvideo/releases/tag/v0.3.3) töltsd le az **APK-t a telefonodra**, az **EXE-t a számítógépedre**. Az EXE-ben benne van az ADB, az OBS-bővítmény és a virtuális kamera. Külön ZIP-re vagy parancssorra nincs szükség.
