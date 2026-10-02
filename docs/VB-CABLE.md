@@ -1,5 +1,7 @@
 # VB-CABLE attribution and license
 
+Historical attribution for the withdrawn 0.3.3 bundle. Current source no longer installs or routes audio through VB-CABLE. This page preserves the license information for existing copies; it is not a current setup recommendation. The reported antivirus detections have not been attributed to a specific component.
+
 The optional Windows microphone uses the standard **VB-CABLE**, a separate,
 closed-source donationware product by **VB-Audio / Vincent Burel**.
 It is not part of DroidVideo's open-source code or MIT/GPL licenses.

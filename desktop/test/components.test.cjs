@@ -33,3 +33,32 @@ test('installer arguments are encoded and quoted, with no system policy changes'
   assert.match(inner,/O''Brien \$stuff/);assert.match(inner,/-Component 'OBS'/);assert.ok(!command.includes('Set-ExecutionPolicy'));
   assert.throws(()=>elevationCommand('dir','command','dir','result'),/Unknown component/);
 });
+
+test('microphone setup is unavailable and never launches an installer',async()=>{
+  let calls=0;
+  const manager=new Components(__dirname,{run:async()=>{calls++;return {stdout:''};}});
+  await assert.rejects(manager.install('Microphone'),/not available yet/);
+  assert.equal(calls,0);
+  assert.equal(manager.status().installing,false);
+});
+
+test('OBS status distinguishes a missing, outdated and matching plugin',async t=>{
+  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'dv-obs-version-'));
+  const pluginDirectory=path.join(directory,'obs-plugins','64bit');
+  fs.mkdirSync(pluginDirectory,{recursive:true});
+  const bundled=path.join(directory,'droidvideo-obs.dll');
+  const installed=path.join(pluginDirectory,'droidvideo-obs.dll');
+  fs.writeFileSync(bundled,'current');
+  t.after(()=>{
+    fs.unlinkSync(installed);fs.unlinkSync(bundled);
+    fs.rmdirSync(pluginDirectory);fs.rmdirSync(path.dirname(pluginDirectory));fs.rmdirSync(directory);
+  });
+  const manager=new Components(directory,{run:async()=>({stdout:''})});manager.obsRoot=directory;
+  let state=await manager.refresh();
+  assert.equal(state.obsPresent,false);assert.equal(state.obsUpdateRequired,false);
+  fs.writeFileSync(installed,'old');state=await manager.refresh();
+  assert.equal(state.obsInstalled,false);assert.equal(state.obsUpdateRequired,true);
+  fs.writeFileSync(installed,'current');state=await manager.refresh();
+  assert.equal(state.obsInstalled,true);assert.equal(state.obsUpdateRequired,false);
+  assert.equal(state.microphoneAvailable,false);
+});

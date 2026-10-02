@@ -9,7 +9,7 @@ class AudioOutput {
   start(){
     if(this.child||Date.now()<this.retryAt||!fs.existsSync(this.executable))return;
     this.stopping=false;this.retryAt=Date.now()+5000;this.ready=false;this.pending=0;
-    const child=spawn(this.executable,this.enabled?['--render']:[],{windowsHide:true,stdio:['pipe','pipe','pipe']});this.child=child;
+    const child=spawn(this.executable,[],{windowsHide:true,stdio:['pipe','pipe','pipe']});this.child=child;
     child.stdout.on('data',data=>{if(this.child!==child||this.stopping)return;for(const b of data){if(b===82)this.ready=true;if(b===65)this.pending=Math.max(0,this.pending-1);}});
     child.stderr.on('data',data=>{this.error=data.toString().trim().slice(0,500);this.onChange();});
     child.on('error',e=>{this.error=e.message;this.onChange();});child.stdin.on('error',()=>{});

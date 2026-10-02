@@ -37,9 +37,7 @@ Hanghoz válassz mikrofont a DroidVideo appban. Az OBS-forrás tulajdonságainá
 
 Indítsd a videót, majd kattints a **Windows virtuális kamera → Bekapcsolás** gombra. Első alkalommal a kamera települ is; fogadd el a Windows engedélykérését. Nyisd meg vagy indítsd újra a másik alkalmazást, és válaszd a **DroidVideo Camera** eszközt.
 
-Hanghoz a **DroidVideo Microphone → Mikrofon beállítása** gombra kattints, majd a VB-CABLE ablakában az **Install Driver** gombra. Ha kéri, indítsd újra a Windowst, majd kattints újra a Mikrofon beállítása gombra. Válassz telefonos mikrofont, indítsd a videót, és kapcsold be a DroidVideo Microphone kimenetet. A másik appban a kamera mellett a **DroidVideo Microphone** hangbemenetet válaszd.
-
-A mikrofont a VB-Audio különálló, zárt forrású, donationware VB-CABLE drivere biztosítja. [Eredeti termék, támogatás és licenc](https://vb-audio.com/Cable/). Üzleti használathoz ellenőrizd a licencfeltételeit. Az OBS-bővítmény telefonos hangjához nem kell VB-CABLE.
+A külső hangkábeles megoldást eltávolítottuk a fejlesztői változatból. A saját DroidVideo Microphone driver még nem érhető el. Az OBS-forrás telefonos hangjához nem kell külön mikrofon-driver.
 
 A kamera 64 bites DirectShow-alkalmazásokat támogat, nem minden Windows-programmal működik. A DroidVideo maradjon futva.
 

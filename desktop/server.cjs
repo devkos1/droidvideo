@@ -203,18 +203,8 @@ async function startServer(options = {}) {
               await virtual.start();cameraRequested=true;
             }else {cameraRequested=false;await maintainOutput();}
             value={...virtual.status(),enabled:cameraRequested};break;
-          case '/setup-microphone':
-            if(!options.components)throw new Error('Open the Windows app to set up the microphone.');
-            value=await options.components.install('Microphone');sendState();break;
-          case '/microphone':
-            if(body.enabled){
-              if(!connected||lastStatus?.phase!=='streaming'||lastStatus?.audioDevice==='off')throw new Error('Start video and choose a phone microphone first.');
-              if(options.components){await options.components.refresh();if(!options.components.status().microphoneInstalled)throw new Error('Set up DroidVideo Microphone first.');}
-            }
-            audioOutput.setEnabled(body.enabled);value=audioOutput.status();sendState();break;
-          case '/cable-info':
-            if(!options.openCableWebsite)throw new Error('Visit https://vb-audio.com/Cable/ for VB-CABLE information and donations.');
-            await options.openCableWebsite();value={opened:true};break;
+          case '/setup-microphone': case '/microphone':
+            throw new Error('The native DroidVideo microphone driver is not available yet. Phone audio in OBS does not need a microphone driver.');
           case '/preview': setPreview(body.enabled);value=state();break;
           case '/background':
             if(!options.enterBackground)throw new Error('Background mode is available in the Windows app.');

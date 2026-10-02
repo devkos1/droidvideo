@@ -10,6 +10,7 @@
     "start": "electron .",
     "server": "node server.cjs",
     "test": "node --test test/*.test.cjs",
+    "predist": "node -e \"console.error('Binary distribution is paused pending investigation of reported antivirus detections.');process.exit(1)\"",
     "dist": "electron-builder --win portable --x64"
   },
   "dependencies": {

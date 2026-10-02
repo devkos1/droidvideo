@@ -35,18 +35,17 @@ class Components {
     // is not a reason to overwrite a compatible DLL loaded by a camera app.
     this.current.cameraInstalled=!!camera&&path.basename(camera).toLowerCase()==='droidvideo-camera.dll'&&fs.existsSync(camera);
     this.current.cameraUpdateAvailable=this.current.cameraInstalled&&!sameFile(camera,path.join(this.directory,'droidvideo-camera.dll'));
+    const installedObs=path.join(this.obsRoot,'obs-plugins','64bit','droidvideo-obs.dll');
+    this.current.obsPresent=fs.existsSync(installedObs);
     this.current.obsInstalled=sameFile(path.join(this.obsRoot,'obs-plugins','64bit','droidvideo-obs.dll'),path.join(this.directory,'droidvideo-obs.dll'));
+    this.current.obsUpdateRequired=this.current.obsPresent&&!this.current.obsInstalled;
     this.current.microphoneInstalled=false;
-    const helper=path.join(this.directory,'droidvideo-audio-bridge.exe');
-    if(fs.existsSync(helper))try{
-      const {stdout}=await this.run(helper,['--list'],{windowsHide:true,timeout:8000,maxBuffer:65536});
-      const capture=JSON.parse(stdout).filter(e=>e.cable&&e.capture);
-      this.current.microphoneInstalled=capture.length===1&&capture[0].name==='DroidVideo Microphone';
-    }catch{}
+    this.current.microphoneAvailable=false;
     return this.status();
   }
   async install(component){
     if(!['Camera','OBS','Microphone'].includes(component))throw new Error('Unknown component');
+    if(component==='Microphone')throw new Error('The external microphone driver has been removed. The native DroidVideo driver is not available yet.');
     if(!this.current.available)throw new Error('Open the bundled DroidVideo Windows app to run setup.');
     if(this.installing)throw new Error('Setup is already running.');
     this.installing=true;

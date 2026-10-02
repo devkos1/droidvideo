@@ -5,21 +5,7 @@ $admin=([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity
 if(!$admin){throw 'Accept the Windows permission prompt to install this component.'}
 if(![Environment]::Is64BitProcess){throw 'Use 64-bit PowerShell.'}
 if($Component -eq 'Microphone'){
-    if($Uninstall){throw 'To remove VB-CABLE, use its original installer. This also removes the microphone from other apps.'}
-    $helper=Join-Path $PSScriptRoot 'droidvideo-audio-bridge.exe'
-    $devices=(& $helper --list | ConvertFrom-Json)
-    if($LASTEXITCODE){throw 'Cannot check Windows audio devices.'}
-    if(!($devices | Where-Object { $_.capture -and $_.cable })){
-        $installer=Join-Path $PSScriptRoot 'vbcable\VBCABLE_Setup_x64.exe'
-        if((Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash -ne '734C35DFA6D98F48782A451633CEB471166EC70D60482FD89A1123D0EE3C4F41'){throw 'VB-CABLE installer checksum mismatch.'}
-        if((Get-AuthenticodeSignature -LiteralPath $installer).Status -ne 'Valid'){throw 'Windows could not verify the VB-CABLE publisher. Check the PC date and internet connection, then try again.'}
-        # The original vendor installer is an interactive step the user must see.
-        Start-Process -FilePath $installer -WorkingDirectory (Split-Path $installer) -WindowStyle Normal -Wait
-        $devices=(& $helper --list | ConvertFrom-Json)
-        if(!($devices | Where-Object { $_.capture -and $_.cable })){throw 'Finish the VB-CABLE installation and restart Windows, then click Set up microphone again.'}
-    }
-    & $helper --rename
-    if($LASTEXITCODE){throw 'Could not name the microphone. Restart Windows and click Set up microphone again.'}
+    throw 'The external microphone driver has been removed. The native DroidVideo driver is not available yet.'
 }elseif($Component -eq 'OBS'){
     if(Get-Process obs64 -ErrorAction SilentlyContinue){throw 'Close OBS Studio first.'}
     $ObsRoot=[IO.Path]::GetFullPath($ObsRoot)
