@@ -33,6 +33,7 @@ struct video_queue {
 	long last_inc;
 	int dup_counter;
 	bool is_writer;
+	size_t mapped_size;
 };
 
 #define ALIGN_SIZE(size, align) size = (((size) + (align - 1)) & (~(align - 1)))
@@ -40,6 +41,8 @@ struct video_queue {
 
 video_queue_t *video_queue_create(uint32_t cx, uint32_t cy, uint64_t interval)
 {
+	if (cx < 2 || cy < 2 || cx > 4096 || cy > 4096 || (cx & 1) || (cy & 1) || !interval)
+		return NULL;
 	struct video_queue vq = {0};
 	struct video_queue *pvq;
 	DWORD frame_size = cx * cy * 3 / 2;
@@ -101,6 +104,7 @@ video_queue_t *video_queue_create(uint32_t cx, uint32_t cy, uint64_t interval)
 	}
 	pvq = malloc(sizeof(vq));
 	if (!pvq) {
+		UnmapViewOfFile(vq.header);
 		CloseHandle(vq.handle);
 		return NULL;
 	}
@@ -122,9 +126,17 @@ video_queue_t *video_queue_open()
 		CloseHandle(vq.handle);
 		return NULL;
 	}
+	MEMORY_BASIC_INFORMATION region;
+	if (!VirtualQuery(vq.header, &region, sizeof(region)) || region.RegionSize < sizeof(struct queue_header)) {
+		UnmapViewOfFile(vq.header);
+		CloseHandle(vq.handle);
+		return NULL;
+	}
+	vq.mapped_size = region.RegionSize;
 
 	struct video_queue *pvq = malloc(sizeof(vq));
 	if (!pvq) {
+		UnmapViewOfFile(vq.header);
 		CloseHandle(vq.handle);
 		return NULL;
 	}
@@ -162,13 +174,27 @@ void video_queue_write(video_queue_t *vq, uint8_t **data, uint32_t *linesize, ui
 	long inc = ++qh->write_idx;
 
 	unsigned long idx = get_idx(inc);
-	size_t size = linesize[0] * qh->cy;
+	uint32_t cx = qh->cx;
+	uint32_t cy = qh->cy;
+	size_t size = (size_t)cx * cy;
 
 	*vq->ts[idx] = timestamp;
-	memcpy(vq->frame[idx], data[0], size);
-	memcpy(vq->frame[idx] + size, data[1], size / 2);
+	if (linesize[0] == cx) {
+		memcpy(vq->frame[idx], data[0], size);
+	} else {
+		for (uint32_t row = 0; row < cy; row++)
+			memcpy(vq->frame[idx] + (size_t)row * cx, data[0] + (size_t)row * linesize[0], cx);
+	}
+	if (linesize[1] == cx) {
+		memcpy(vq->frame[idx] + size, data[1], size / 2);
+	} else {
+		for (uint32_t row = 0; row < cy / 2; row++)
+			memcpy(vq->frame[idx] + size + (size_t)row * cx, data[1] + (size_t)row * linesize[1], cx);
+	}
 
+	MemoryBarrier();
 	qh->read_idx = inc;
+	MemoryBarrier();
 	qh->state = SHARED_QUEUE_STATE_READY;
 }
 
@@ -179,7 +205,19 @@ enum queue_state video_queue_state(video_queue_t *vq)
 	}
 
 	enum queue_state state = (enum queue_state)vq->header->state;
+	MemoryBarrier();
 	if (!vq->ready_to_read && state == SHARED_QUEUE_STATE_READY) {
+		struct queue_header *qh = vq->header;
+		if (qh->cx < 2 || qh->cy < 2 || qh->cx > 4096 || qh->cy > 4096 || (qh->cx & 1) || (qh->cy & 1) || !qh->interval)
+			return SHARED_QUEUE_STATE_INVALID;
+		size_t frame_size = (size_t)qh->cx * qh->cy * 3 / 2;
+		size_t previous_end = sizeof(struct queue_header);
+		for (size_t i = 0; i < 3; i++) {
+			size_t offset = qh->offsets[i];
+			if ((offset & 31) || offset < previous_end || offset > vq->mapped_size || frame_size + FRAME_HEADER_SIZE > vq->mapped_size - offset)
+				return SHARED_QUEUE_STATE_INVALID;
+			previous_end = offset + FRAME_HEADER_SIZE + frame_size;
+		}
 		for (size_t i = 0; i < 3; i++) {
 			size_t off = vq->header->offsets[i];
 			vq->ts[i] = (uint64_t *)(((uint8_t *)vq->header) + off);
@@ -195,8 +233,9 @@ bool video_queue_read(video_queue_t *vq, nv12_scale_t *scale, void *dst, uint64_
 {
 	struct queue_header *qh = vq->header;
 	long inc = qh->read_idx;
+	MemoryBarrier();
 
-	if (qh->state == SHARED_QUEUE_STATE_STOPPING) {
+	if (!vq->ready_to_read || qh->state != SHARED_QUEUE_STATE_READY) {
 		return false;
 	}
 
@@ -209,12 +248,24 @@ bool video_queue_read(video_queue_t *vq, nv12_scale_t *scale, void *dst, uint64_
 		vq->last_inc = inc;
 	}
 
-	unsigned long idx = get_idx(inc);
+	/* The writer reuses slot (inc % 3) when it starts frame inc + 3. If that
+	 * happened during the copy, the picture may be torn; retry with the
+	 * newest frame. After a few attempts keep the copy rather than stall. */
+	for (int attempt = 0;; attempt++) {
+		unsigned long idx = get_idx(inc);
 
-	*ts = *vq->ts[idx];
+		*ts = *vq->ts[idx];
 
-	nv12_do_scale(scale, dst, vq->frame[idx]);
-	return true;
+		nv12_do_scale(scale, dst, vq->frame[idx]);
+
+		MemoryBarrier();
+		if ((uint32_t)(qh->write_idx - (uint32_t)inc) < 3 || attempt == 2)
+			return true;
+
+		inc = qh->read_idx;
+		MemoryBarrier();
+		vq->last_inc = inc;
+	}
 }
 
 bool video_queue_read_latest(video_queue_t *vq, nv12_scale_t *scale, void *dst, uint64_t *ts)

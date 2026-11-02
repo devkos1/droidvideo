@@ -39,7 +39,7 @@ class VirtualCamera {
     if(!Number.isInteger(w)||!Number.isInteger(h)||w<48||h<48||w>3840||h>3840||(w&1)||(h&1)||!Number.isInteger(fps)||fps<1||fps>60||![0,90,180,270].includes(rotation))return;
     const signature=`${w}/${h}/${fps}`;
     if(signature!==this.signature)this.waitingKey=true;
-    if(child.stdin.writableLength>512*1024||(!this.waitingKey&&this.inFlight>=4)){
+    if(child.stdin.writableLength>4*1024*1024||(!this.waitingKey&&this.inFlight>=4)){
       if(!this.waitingKey){this.waitingKey=true;this.requestKey();}return;
     }
     if(this.waitingKey&&(flags!==1||child.stdin.writableLength))return;

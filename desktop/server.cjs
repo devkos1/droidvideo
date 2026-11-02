@@ -44,7 +44,16 @@ async function startServer(options = {}) {
   let reconnectTimer = null, streamError = '', monitor = null, missed = 0;
   const tcpClients = new Set();
   const ws = new WebSocketServer({ noServer: true, maxPayload: 1024 });
-  const keyFrame = () => { if (controlPort) rpc(controlPort, '/keyframe').catch(() => {}); };
+  // Every consumer (preview, OBS pipe, virtual camera) may ask for a sync frame.
+  // Coalesce them so a congested link is not flooded with large keyframes.
+  let lastKeyFrame = 0, keyFrameTimer = null;
+  const keyFrame = () => {
+    if (!controlPort || closing) return;
+    const wait = lastKeyFrame + 500 - Date.now();
+    if (wait > 0) { keyFrameTimer ??= setTimeout(() => { keyFrameTimer = null; keyFrame(); }, wait); return; }
+    lastKeyFrame = Date.now();
+    rpc(controlPort, '/keyframe').catch(() => {});
+  };
   const virtual = options.virtualCamera || new VirtualCamera(options.nativePath || path.resolve(__dirname,'../native/build'),()=>sendState(),keyFrame);
   const audioOutput=new AudioOutput(options.nativePath || path.resolve(__dirname,'../native/build'),()=>sendState());
   async function maintainOutput(){
@@ -67,14 +76,16 @@ async function startServer(options = {}) {
     for (const client of ws.clients) {
       if(!previewEnabled)continue;
       if (client.readyState !== WebSocket.OPEN) continue;
-      if (client.bufferedAmount > 2 * 1024 * 1024) { client.terminate(); continue; }
       if (flags === 2) { client.send(packet); continue; }
+      // Dropping until the next keyframe keeps the preview connected; a reconnect
+      // would briefly report the phone as disconnected in the UI.
+      if (client.bufferedAmount > 2 * 1024 * 1024) { client.waitingKey = true; continue; }
       if (client.waitingKey && flags !== 1) continue;
       client.waitingKey = false; client.send(packet);
     }
     for (const client of tcpClients) {
-      if (client.writableLength > 2 * 1024 * 1024) { client.destroy(); continue; }
       if (flags === 2) continue;
+      if (client.writableLength > 2 * 1024 * 1024) { client.waitingKey = true; continue; }
       if (client.waitingKey) {
         if (flags !== 1 || !codecConfig) continue;
         client.waitingKey = false;
@@ -103,6 +114,7 @@ async function startServer(options = {}) {
   async function disconnect() {
     cameraRequested=false;virtual.stop();virtual.reset();audioOutput.setEnabled(false);
     connected = false; clearTimeout(reconnectTimer); clearInterval(monitor); monitor = null;
+    clearTimeout(keyFrameTimer); keyFrameTimer = null; lastKeyFrame = 0;
     const port = controlPort; controlPort = null; videoPort = null; serial = null;
     if (upstream) { const old = upstream; upstream = null; old.destroy(); }
     for (const client of tcpClients) client.destroy();
@@ -151,7 +163,7 @@ async function startServer(options = {}) {
     let url;
     try { url = new URL(req.url, base); } catch { return json(400, { error: 'Invalid URL' }); }
     if (req.method === 'GET' && url.pathname === '/api/bootstrap') {
-      return json(200, { token, obsSource:'DroidVideo Camera + Audio', version: '0.3.3' });
+      return json(200, { token, obsSource:'DroidVideo Camera + Audio', version: '0.3.4' });
     }
     if (url.pathname.startsWith('/api/')) {
       if (req.method !== 'POST' || req.headers['x-droidvideo-token'] !== token || (req.headers.origin && req.headers.origin !== base)) return json(403, { error: 'Invalid session' });

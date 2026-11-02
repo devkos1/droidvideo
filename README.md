@@ -8,15 +8,9 @@ Stream your Android camera and microphone over USB or Wi-Fi to OBS Studio or a W
 
 [Project website](https://devkos1.github.io/droidvideo/) · Made by **devkos1**. English by default; [magyar útmutató](docs/SETUP.hu.md).
 
-## Download status — investigation in progress
+## Download just two files
 
-**Version 0.3.3 has been withdrawn following a reported Bitdefender detection during setup. The detection has not yet been classified. Do not disable antivirus protection or add an exclusion to run it.** A replacement binary will not be published until the affected component is identified and reviewed.
-
-The reported event is Advanced Threat Defense `SuspiciousBehavior.2F8632572ABFA976`. See the [investigation status](docs/SECURITY-INVESTIGATION.md) for confirmed findings and remaining checks.
-
-## Distribution format
-
-The 0.3.3 download is currently unavailable. Older releases are not a verified workaround.
+[**Download DroidVideo 0.3.4**](https://github.com/devkos1/droidvideo/releases/tag/v0.3.4)
 
 - **Android APK** → put this on your phone.
 - **Windows EXE** → open this on your PC. ADB, the OBS plug-in and the virtual camera are already inside. No extra ZIP or command line needed.

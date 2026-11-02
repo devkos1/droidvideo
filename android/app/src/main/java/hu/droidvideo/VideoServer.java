@@ -2,6 +2,7 @@ package hu.droidvideo;
 
 import java.io.*;
 import java.net.*;
+import java.nio.ByteBuffer;
 import java.util.concurrent.ArrayBlockingQueue;
 
 /** Loopback-only, bounded video delivery. Never block the camera/codec thread. */
@@ -53,12 +54,10 @@ final class VideoServer implements AutoCloseable {
     }
 
     static byte[] packet(int flags, long timestamp, byte[] bytes) {
-        try {
-            ByteArrayOutputStream out = new ByteArrayOutputStream(bytes.length + 13);
-            DataOutputStream data = new DataOutputStream(out);
-            data.writeByte(flags); data.writeLong(timestamp); data.writeInt(bytes.length); data.write(bytes);
-            return out.toByteArray();
-        } catch (IOException impossible) { throw new AssertionError(impossible); }
+        byte[] out = new byte[bytes.length + 13];
+        ByteBuffer.wrap(out, 0, 13).put((byte) flags).putLong(timestamp).putInt(bytes.length);
+        System.arraycopy(bytes, 0, out, 13, bytes.length);
+        return out;
     }
 
     synchronized void publish(int flags, long timestamp, byte[] bytes) {

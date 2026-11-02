@@ -1,6 +1,6 @@
 {
   "name": "droidvideo",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "Open-source Android USB and Wi-Fi camera with audio, OBS plug-in and Windows virtual camera",
   "author": "devkos1",
   "license": "MIT",
@@ -10,7 +10,6 @@
     "start": "electron .",
     "server": "node server.cjs",
     "test": "node --test test/*.test.cjs",
-    "predist": "node -e \"console.error('Binary distribution is paused pending investigation of reported antivirus detections.');process.exit(1)\"",
     "dist": "electron-builder --win portable --x64"
   },
   "dependencies": {

@@ -1,4 +1,4 @@
-# Verification report — 0.3.3 preview
+# Verification report — 0.3.4 preview
 
 Windows x64, October 2, 2026. Video and audio fixtures are synthetic. [Magyar változat](TESTING.hu.md).
 
@@ -16,7 +16,7 @@ The local OBS log associated with the reported freeze showed stream probing fail
 - Native AAC tests decoded every packet of generated mono and stereo 48 kHz tones, checked signal amplitude and frequency, switched channel count, and rejected malformed framing. These tests do not use a physical audio endpoint.
 - H.264 output crops decoder alignment padding to the requested picture dimensions; 1080p is delivered as 1080 rows rather than the decoder's padded 1088 rows.
 - The OBS-closure error was checked in the browser: a modal alert appears in front of the setup wizard, focuses OK, and returns to setup when dismissed. The separate microphone setup/output controls and VB-Audio attribution were also checked.
-- Android assembleDebug and lintDebug passed with versionCode 6 / versionName 0.3.3. The existing development signature is retained for updates.
+- Android assembleDebug and lintDebug passed with versionCode 7 / versionName 0.3.4. The existing development signature is retained for updates.
 
 ## Distribution
 

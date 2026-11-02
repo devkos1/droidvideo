@@ -22,7 +22,7 @@ public:
     }
     void write(const int16_t *data,uint32_t frames,uint32_t channels,uint64_t timestamp){
         if(!memory||!channels||channels>2||frames*channels>4096)return;
-        auto wait=WaitForSingleObject(mutex,0);if(wait!=WAIT_OBJECT_0&&wait!=WAIT_ABANDONED)return;
+        auto wait=WaitForSingleObject(mutex,20);if(wait!=WAIT_OBJECT_0&&wait!=WAIT_ABANDONED)return;
         auto sequence=memory->sequence+1;auto &block=memory->blocks[sequence%32];
         block.sequence=sequence;block.timestamp=timestamp;block.frames=frames;block.channels=channels;
         memcpy(block.samples,data,size_t(frames)*channels*2);memory->sequence=sequence;ReleaseMutex(mutex);

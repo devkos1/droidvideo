@@ -1,7 +1,5 @@
 # Building DroidVideo
 
-Binary packaging and distribution are currently paused while reported antivirus detections during 0.3.3 installation are investigated. The commands below document the build pipeline; packaging deliberately stops. Existing build output is not cleared or approved for distribution. Desktop source tests remain available with `npm --prefix desktop test`.
-
 Windows x64 is required. Install JDK 17 or 21, Android SDK platform 36, Node.js 22+ with npm, Python 3, Git, Visual Studio 2019/2022 C++ Build Tools with a Windows SDK, and OBS Studio 32.x x64. Set `JAVA_HOME` and `ANDROID_HOME`. FFmpeg/ffprobe are needed only for the media verification tool.
 
 ## Native headers
@@ -21,7 +19,7 @@ Expected commit: `5533a277e4400203b50114c993f89878d50a27b9`. `build-native.ps1` 
 .\tools\build.ps1
 ```
 
-The script builds/lints Android, runs desktop tests, builds and checks native components, creates corresponding source, prepares bundled ADB/components/notices, then packages and checks Windows. Outputs: `dist/DroidVideo-0.3.3-Android.apk` and `dist/windows/DroidVideo-0.3.3-Windows.exe`.
+The script builds/lints Android, runs desktop tests, builds and checks native components, creates corresponding source, prepares bundled ADB/components/notices, then packages and checks Windows. Outputs: `dist/DroidVideo-0.3.4-Android.apk` and `dist/windows/DroidVideo-0.3.4-Windows.exe`.
 
 The bundle pipeline uses a pinned official ADB archive with SHA-256 verification. Only ADB, its two USB libraries and notices are included. External microphone driver setup has been removed from current source. A native DroidVideo microphone driver is not yet available. The planned EXE also contains the OBS plug-in, DirectShow camera, frame writer, installer script and source archive. Internet is needed at build time.
 

@@ -10,20 +10,23 @@
 static bool readAll(void *data,size_t n){auto p=(uint8_t*)data;while(n){DWORD got=0;if(!ReadFile(GetStdHandle(STD_INPUT_HANDLE),p,DWORD(n),&got,nullptr)||!got)return false;p+=got;n-=got;}return true;}
 // Tiling keeps both sides of a 4K transpose in cache.
 template<typename Pixel,int Angle>
-static void rotate(const uint8_t *input,uint8_t *output,int w,int h){
+static void rotate(const uint8_t *input,uint8_t *output,int w,int h,size_t srcStride){
     auto src=reinterpret_cast<const Pixel*>(input);auto dst=reinterpret_cast<Pixel*>(output);
-    if constexpr(Angle==180){std::reverse_copy(src,src+size_t(w)*h,dst);}
+    if constexpr(Angle==180){
+        if(srcStride==size_t(w))std::reverse_copy(src,src+size_t(w)*h,dst);
+        else for(int y=0;y<h;++y)std::reverse_copy(src+size_t(y)*srcStride,src+size_t(y)*srcStride+w,dst+size_t(h-1-y)*w);
+    }
     else for(int by=0;by<h;by+=32)for(int bx=0;bx<w;bx+=32)
         for(int y=by;y<std::min(by+32,h);++y)for(int x=bx;x<std::min(bx+32,w);++x){
-            if constexpr(Angle==90)dst[size_t(x)*h+h-1-y]=src[size_t(y)*w+x];
-            else dst[size_t(w-1-x)*h+y]=src[size_t(y)*w+x];
+            if constexpr(Angle==90)dst[size_t(x)*h+h-1-y]=src[size_t(y)*srcStride+x];
+            else dst[size_t(w-1-x)*h+y]=src[size_t(y)*srcStride+x];
         }
 }
 template<typename Pixel>
-static void rotatePlane(const uint8_t *src,uint8_t *dst,int w,int h,int angle){
-    if(angle==90)rotate<Pixel,90>(src,dst,w,h);
-    else if(angle==180)rotate<Pixel,180>(src,dst,w,h);
-    else rotate<Pixel,270>(src,dst,w,h);
+static void rotatePlane(const uint8_t *src,uint8_t *dst,int w,int h,int angle,size_t srcStride){
+    if(angle==90)rotate<Pixel,90>(src,dst,w,h,srcStride);
+    else if(angle==180)rotate<Pixel,180>(src,dst,w,h,srcStride);
+    else rotate<Pixel,270>(src,dst,w,h,srcStride);
 }
 static void interleave(const uint8_t *u,const uint8_t *v,uint8_t *uv,size_t count){
     size_t i=0;for(;i+16<=count;i+=16){
@@ -43,14 +46,16 @@ class FrameOutput {
 public:
     FrameOutput(){QueryPerformanceFrequency(&frequency);}
     ~FrameOutput(){if(queue)video_queue_close(queue);}
-    bool write(uint8_t *y,uint8_t *uv,uint32_t w,uint32_t h,uint32_t fps,uint32_t angle){
+    bool write(uint8_t *y,uint8_t *uv,uint32_t w,uint32_t h,uint32_t fps,uint32_t angle,uint32_t stride=0){
+        if(!stride)stride=w;
         const size_t ySize=size_t(w)*h;
         const uint32_t outW=angle%180?h:w,outH=angle%180?w:h;
-        if(angle){rotated.resize(ySize*3/2);rotatePlane<uint8_t>(y,rotated.data(),w,h,angle);rotatePlane<uint16_t>(uv,rotated.data()+ySize,w/2,h/2,angle);y=rotated.data();uv=y+ySize;}
+        uint32_t outStride=stride;
+        if(angle){rotated.resize(ySize*3/2);rotatePlane<uint8_t>(y,rotated.data(),w,h,angle,stride);rotatePlane<uint16_t>(uv,rotated.data()+ySize,w/2,h/2,angle,stride/2);y=rotated.data();uv=y+ySize;outStride=outW;}
         if(queue&&(ow!=outW||oh!=outH||rate!=fps)){video_queue_close(queue);queue=nullptr;}
         if(!queue){queue=video_queue_create(outW,outH,10000000ULL/fps);ow=outW;oh=outH;rate=fps;}
         if(!queue)return false;
-        uint8_t *planes[2]={y,uv};uint32_t strides[2]={outW,outW};
+        uint8_t *planes[2]={y,uv};uint32_t strides[2]={outStride,outStride};
         LARGE_INTEGER now;QueryPerformanceCounter(&now);
         video_queue_write(queue,planes,strides,uint64_t(now.QuadPart*10000000.0/frequency.QuadPart));
         return true;

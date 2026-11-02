@@ -23,8 +23,9 @@ static void releaseMic(DroidSource*s){if(!s->mic)return;obs_source_remove_audio_
 static void run(DroidSource*s){
  SOCKET socket=::socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP);sockaddr_in address{};address.sin_family=AF_INET;address.sin_port=htons(27190);address.sin_addr.s_addr=htonl(INADDR_LOOPBACK);
  video_queue_t *video=nullptr;AudioQueue audio;uint64_t audioSequence=0,lastHello=0,lastFrame=0;std::vector<uint8_t> pixels;nv12_scale_t scale{};uint32_t w=0,h=0;uint64_t interval=0;
- try {while(WaitForSingleObject(s->stop,5)==WAIT_TIMEOUT){
-  uint64_t now=GetTickCount64();bool active=obs_source_active(s->owner)||obs_source_showing(s->owner);
+ bool active=true;
+ try {while(WaitForSingleObject(s->stop,active?2:25)==WAIT_TIMEOUT){
+  uint64_t now=GetTickCount64();active=obs_source_active(s->owner)||obs_source_showing(s->owner);
   if(active&&now-lastHello>=500){const char hello[]="DroidVideoDecoded1";sendto(socket,hello,sizeof(hello)-1,0,(sockaddr*)&address,sizeof(address));lastHello=now;}
   if(!active){if(video){video_queue_close(video);video=nullptr;}continue;}
   if(!video)video=video_queue_open();

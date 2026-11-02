@@ -72,6 +72,7 @@ export class CameraPlayer {
     if(flags === 3) return; // AAC is delivered to the OBS plug-in; preview is muted.
     if (flags === 2) { this.configure(payload); return; }
     if (!this.config) return;
+    if (document.hidden && this.lastDraw) { this.waitingKey = true; return; }
     const key = flags === 1;
     if (this.decoder?.state !== 'configured' || this.decoder.decodeQueueSize > 4) { this.waitingKey = true; this.makeDecoder(); }
     if (this.waitingKey && !key) return;

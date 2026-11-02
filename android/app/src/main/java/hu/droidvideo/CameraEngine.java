@@ -45,6 +45,10 @@ final class CameraEngine implements AutoCloseable {
     private int previewWidth, previewHeight;
     private JSONArray cachedCatalog;
     private boolean catalogEnglish;
+    private Map<String,MediaCodecInfo.VideoCapabilities> avcEncoders;
+    private static final long KEY_FRAME_GAP_NS = 500_000_000L;
+    private long lastKeyFrameNs;
+    private boolean keyFramePending;
 
     CameraEngine(Context activity, TextureView preview) throws Exception {
         this.activity = activity; this.preview = preview;
@@ -98,25 +102,30 @@ final class CameraEngine implements AutoCloseable {
         catch (TimeoutException e) { task.cancel(false); throw new Exception(UiText.choose(activity,"Camera request timed out.","A kamera nem válaszolt időben.")); }
     }
 
-    private boolean encoderSupports(int w, int h, int f) {
+    /** Building a MediaCodecList is slow; the catalog checks every camera and mode against it. */
+    private Map<String,MediaCodecInfo.VideoCapabilities> avcEncoders() {
+        if (avcEncoders != null) return avcEncoders;
+        Map<String,MediaCodecInfo.VideoCapabilities> result = new LinkedHashMap<>();
         for (MediaCodecInfo info : new MediaCodecList(MediaCodecList.REGULAR_CODECS).getCodecInfos()) {
             if (!info.isEncoder()) continue;
             if (Build.VERSION.SDK_INT >= 29 && !info.isHardwareAccelerated()) continue;
             if (Build.VERSION.SDK_INT < 29 && (info.getName().startsWith("OMX.google.") || info.getName().startsWith("c2.android."))) continue;
-            try { if (info.getCapabilitiesForType("video/avc").getVideoCapabilities().areSizeAndRateSupported(w, h, f)) return true; }
+            try { result.put(info.getName(), info.getCapabilitiesForType("video/avc").getVideoCapabilities()); }
             catch (IllegalArgumentException ignored) {}
         }
+        avcEncoders = result;
+        return result;
+    }
+
+    private boolean encoderSupports(int w, int h, int f) {
+        for (MediaCodecInfo.VideoCapabilities caps : avcEncoders().values())
+            if (caps.areSizeAndRateSupported(w, h, f)) return true;
         return false;
     }
 
     private String encoderName(int w, int h, int f) {
-        for (MediaCodecInfo info : new MediaCodecList(MediaCodecList.REGULAR_CODECS).getCodecInfos()) {
-            if (!info.isEncoder()) continue;
-            if (Build.VERSION.SDK_INT >= 29 && !info.isHardwareAccelerated()) continue;
-            if (Build.VERSION.SDK_INT < 29 && (info.getName().startsWith("OMX.google.") || info.getName().startsWith("c2.android."))) continue;
-            try { if (info.getCapabilitiesForType("video/avc").getVideoCapabilities().areSizeAndRateSupported(w, h, f)) return info.getName(); }
-            catch (IllegalArgumentException ignored) {}
-        }
+        for (Map.Entry<String,MediaCodecInfo.VideoCapabilities> entry : avcEncoders().entrySet())
+            if (entry.getValue().areSizeAndRateSupported(w, h, f)) return entry.getKey();
         throw new IllegalArgumentException(UiText.choose(activity,"No compatible hardware H.264 encoder.","Nincs megfelelő hardveres H.264-kódoló."));
     }
 
@@ -376,6 +385,14 @@ final class CameraEngine implements AutoCloseable {
 
     private void keyFrame() {
         if (encoder == null) return;
+        // Coalesce requests: each 4K sync frame is large, and back-to-back requests
+        // from congested receivers would otherwise amplify the congestion.
+        long wait = lastKeyFrameNs + KEY_FRAME_GAP_NS - System.nanoTime();
+        if (lastKeyFrameNs != 0 && wait > 0) {
+            if (!keyFramePending) { keyFramePending = true; handler.postDelayed(() -> { keyFramePending = false; keyFrame(); }, wait / 1_000_000L + 1); }
+            return;
+        }
+        lastKeyFrameNs = System.nanoTime();
         try { Bundle params = new Bundle(); params.putInt(MediaCodec.PARAMETER_KEY_REQUEST_SYNC_FRAME,0); encoder.setParameters(params); }
         catch (IllegalStateException ignored) {}
     }
@@ -421,7 +438,7 @@ final class CameraEngine implements AutoCloseable {
         if (encoder != null) { try { encoder.stop(); } catch (Exception ignored) {} encoder.release(); encoder=null; }
         if (encoderSurface != null) { encoderSurface.release(); encoderSurface=null; }
         if (previewSurface != null) { previewSurface.release(); previewSurface=null; }
-        request=null; phase="idle"; frames=0; bytes=0; startNs=0; codecConfig=null; video.reset();
+        request=null; phase="idle"; frames=0; bytes=0; startNs=0; codecConfig=null; lastKeyFrameNs=0; video.reset();
         if(wifiVideo != null) wifiVideo.reset();
     }
     public void close() {

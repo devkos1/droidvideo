@@ -31,14 +31,10 @@ class Decoder {
     FrameOutput output;
     UINT32 width=0,height=0,fps=30,angle=0,decodedWidth=0,decodedHeight=0;
     LONGLONG time=0;
-    std::vector<uint8_t> contiguous,cropped;
+    std::vector<uint8_t> contiguous;
     bool writeCpu(uint8_t *data){
         auto uv=data+size_t(decodedWidth)*decodedHeight;
-        if(width==decodedWidth&&height==decodedHeight)return output.write(data,uv,width,height,fps,angle);
-        const size_t size=size_t(width)*height;cropped.resize(size*3/2);
-        for(UINT32 row=0;row<height;row++)memcpy(cropped.data()+size_t(row)*width,data+size_t(row)*decodedWidth,width);
-        for(UINT32 row=0;row<height/2;row++)memcpy(cropped.data()+size+size_t(row)*width,uv+size_t(row)*decodedWidth,width);
-        return output.write(cropped.data(),cropped.data()+size,width,height,fps,angle);
+        return output.write(data,uv,width,height,fps,angle,decodedWidth);
     }
     void outputType(){
         reusableSample.Reset();staging.Reset();
@@ -64,12 +60,12 @@ class Decoder {
             if(!staging){desc.ArraySize=1;desc.MipLevels=1;desc.BindFlags=0;desc.MiscFlags=0;desc.Usage=D3D11_USAGE_STAGING;desc.CPUAccessFlags=D3D11_CPU_ACCESS_READ;checked(device->CreateTexture2D(&desc,nullptr,&staging));}
             context->CopySubresourceRegion(staging.Get(),0,0,0,0,texture.Get(),subresource,nullptr);
             D3D11_MAPPED_SUBRESOURCE mapped{};checked(context->Map(staging.Get(),0,D3D11_MAP_READ,0,&mapped));
-            const size_t size=size_t(width)*height;
-            contiguous.resize(size*3/2);
-            for(UINT32 row=0;row<height;row++)memcpy(contiguous.data()+size_t(row)*width,static_cast<BYTE*>(mapped.pData)+size_t(row)*mapped.RowPitch,width);
-            for(UINT32 row=0;row<height/2;row++)memcpy(contiguous.data()+size+size_t(row)*width,static_cast<BYTE*>(mapped.pData)+size_t(desc.Height+row)*mapped.RowPitch,width);
+            auto *base=static_cast<uint8_t*>(mapped.pData);
+            bool written=false;
+            try{written=output.write(base,base+size_t(desc.Height)*mapped.RowPitch,width,height,fps,angle,mapped.RowPitch);}
+            catch(...){context->Unmap(staging.Get(),0);throw;}
             context->Unmap(staging.Get(),0);
-            if(output.write(contiguous.data(),contiguous.data()+size,width,height,fps,angle))signalFrame(1);
+            if(written)signalFrame(1);
             return;
         }
         ComPtr<IMFMediaBuffer> buffer;checked(sample->ConvertToContiguousBuffer(&buffer));

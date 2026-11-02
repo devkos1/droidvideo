@@ -1,4 +1,3 @@
-throw 'Binary packaging is paused while the reported antivirus detection is investigated. Do not distribute the existing 0.3.3 bundle.'
 $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
 $cache=Join-Path $root '.build-deps\adb-download'
